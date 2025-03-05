@@ -1,35 +1,43 @@
+// src/pages/profilePage.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import userService, { User } from '../services/user_service';
-import post_service from '../services/post_service';
+import postService from '../services/post_service';
 import MapComponent from '../components/MapComponent';
 import Footer from '../components/shared/Footer';
 import { getImageUrl } from '../utils/imageUtils';
 import PostCard from '../components/PostCard';
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
-import { SavedPost } from '../types';
+import { Post } from '../types';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<SavedPost[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  console.log('Rendering ProfilePage component');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        console.log('Fetching user data...');
 
         const { request } = userService.getMe();
         const response = await request;
-        setUser(response.data);
+        const userData = response.data;
+        setUser(userData);
+        console.log('User data fetched:', userData);
 
-        if (response.data._id) {
+        if (userData._id) {
           try {
-            const userPosts = await post_service.getByUserId(response.data._id);
-
+            console.log(`Fetching posts for user ID: ${userData._id}`);
+            const userPosts = await postService.getByUserId(userData._id);
+            console.log('Posts fetched:', userPosts);
             setPosts(userPosts);
           } catch (error) {
             console.error('Failed to load trips:', error);
@@ -59,7 +67,7 @@ const ProfilePage: React.FC = () => {
     }, 0);
   };
 
-  const handleDownloadPost = (post: SavedPost) => {
+  const handleDownloadPost = (post: Post) => {
     try {
       const fileContent = `${post.title}\n\n${post.description}\n\n${post.itinerary?.join('\n\n') || ''}
         \nPost Details:
@@ -80,16 +88,44 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleEditPost = (postId: string) => {
+    console.log(`Navigating to edit post: ${postId}`);
+    navigate(`/edit-post/${postId}`);
+  };
+
   const handleDeletePost = async (postId: string) => {
+    console.log(`Deleting post: ${postId}`);
     try {
-      await post_service.deletePost(postId);
+      setIsDeleting(true);
+      await postService.deletePost(postId);
       setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
       toast.success('Post deleted successfully');
       setPostToDelete(null);
     } catch (error) {
       console.error('Failed to delete post:', error);
       toast.error('Failed to delete post');
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleLikePost = async (postId: string) => {
+    try {
+      await postService.likePost(postId);
+
+      // Refresh the specific post after liking
+      const updatedPost = await postService.getPostById(postId);
+      setPosts((prevPosts) => prevPosts.map((post) => (post._id === postId ? updatedPost : post)));
+
+      toast.success('Trip liked!');
+    } catch (error) {
+      console.error('Error liking trip:', error);
+      toast.error('Could not like trip. Please try again.');
+    }
+  };
+
+  const handleCommentClick = (postId: string) => {
+    navigate(`/post/${postId}`, { state: { showComments: true } });
   };
 
   if (loading) {
@@ -178,10 +214,11 @@ const ProfilePage: React.FC = () => {
                   <div key={post._id} className="col-md-6 col-lg-4">
                     <PostCard
                       post={post}
-                      onDownload={() => handleDownloadPost(post)}
+                      onLike={() => handleLikePost(post._id)}
+                      onCommentClick={() => handleCommentClick(post._id)}
+                      onEdit={() => handleEditPost(post._id)}
                       onDelete={() => setPostToDelete(post._id)}
-                      onLike={() => console.log('Liked post', post._id)}
-                      onCommentClick={() => console.log('Comment clicked for post', post._id)}
+                      showActions={true}
                     />
                   </div>
                 ))}
@@ -196,7 +233,15 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      <DeleteConfirmationDialog isOpen={!!postToDelete} onClose={() => setPostToDelete(null)} onConfirm={() => postToDelete && handleDeletePost(postToDelete)} />
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={!!postToDelete}
+        onClose={() => setPostToDelete(null)}
+        onConfirm={() => postToDelete && handleDeletePost(postToDelete)}
+        isDeleting={isDeleting}
+        title="Delete Trip"
+        message="Are you sure you want to delete this trip? This action cannot be undone."
+      />
 
       <Footer />
     </div>

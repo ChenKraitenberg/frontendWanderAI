@@ -1,88 +1,30 @@
-// import apiClient from './api-client';
-// import { Post, SavedTrip, GeneratedTrip } from '../types';
-
-// class PostService {
-//   async saveTrip(tripData: GeneratedTrip): Promise<SavedTrip> {
-//     try {
-//       const response = await apiClient.post<SavedTrip>('/trips', tripData);
-//       return response.data;
-//     } catch (error) {
-//       console.error('Error saving trip:', error);
-//       throw error;
-//     }
-//   }
-
-//   getAll(userId?: string) {
-//     const url = userId ? `/trips?userId=${userId}` : '/trips';
-//     return apiClient.get<Post[]>(url).then((res) => res.data);
-//   }
-
-//   async createPost(postData: { name: string; description: string; startDate: string; endDate: string; price: number; maxSeats: number; image?: string }) {
-//     console.log('Creating post with data:', postData);
-//     try {
-//       const response = await apiClient.post('/trips', {
-//         name: postData.name,
-//         description: postData.description,
-//         startDate: postData.startDate,
-//         endDate: postData.endDate,
-//         price: postData.price,
-//         maxSeats: postData.maxSeats,
-//         bookedSeats: 0,
-//         image: postData.image,
-//         comments: [],
-//         likes: [],
-//       });
-//       return response.data;
-//     } catch (error) {
-//       console.error('Error creating post:', error);
-//       throw error;
-//     }
-//   }
-
-//   likePost(postId: string) {
-//     return apiClient.post(`/trips/${postId}/like`);
-//   }
-
-//   addComment(postId: string, text: string) {
-//     return apiClient.post(`/trips/${postId}/comment`, { text });
-//   }
-
-//   getPosts() {
-//     return apiClient.get<Post[]>('/trips').then((res) => res.data);
-//   }
-
-//   getByUserId(userId: string) {
-//     return apiClient.get<Post[]>(`/trips?userId=${userId}`).then((res) => res.data);
-//   }
-
-//   async uploadImage(formData: FormData) {
-//     try {
-//       const response = await apiClient.post('/file', formData, {
-//         headers: {
-//           'Content-Type': 'multipart/form-data',
-//         },
-//       });
-//       console.log('Image upload response:', response.data);
-//       return response.data;
-//     } catch (error) {
-//       console.error('Error uploading image:', error);
-//       throw error;
-//     }
-//   }
-
-//   deletePost(postId: string) {
-//     return apiClient.delete(`/trips/${postId}`);
-//   }
-
-//   getComments(postId: string) {
-//     return apiClient.get<Comment[]>(`/trips/${postId}/comments`);
-//   }
-// }
-
-// export default new PostService();
 // src/services/post_service.ts
 import apiClient from './api-client';
 import { Post } from '../types';
+
+// Define a CreatePostData interface that matches what we're sending to the server
+interface CreatePostData {
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  price: number;
+  maxSeats: number;
+  bookedSeats: number;
+  image: string;
+}
+
+// Define an UpdatePostData interface for updating posts
+interface UpdatePostData {
+  name?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  price?: number;
+  maxSeats?: number;
+  bookedSeats?: number;
+  image?: string;
+}
 
 class PostService {
   // Get all posts
@@ -107,15 +49,61 @@ class PostService {
       });
   }
 
-  // Create a new post
-  createPost(postData: { title: string; content: string; author: string }) {
+  // Create a new post with more flexible typing
+  createPost(postData: CreatePostData) {
+    console.log('Creating post with data:', postData);
     return apiClient
       .post('/posts', postData)
-      .then((response) => response.data)
+      .then((response) => {
+        console.log('Post created successfully:', response.data);
+        return response.data;
+      })
       .catch((error) => {
         console.error('Error creating post:', error);
         throw error;
       });
+  }
+
+  // Update an existing post - using delete and recreate approach
+  // since the server doesn't have a direct update endpoint
+  async updatePost(id: string, postData: UpdatePostData) {
+    console.log(`Updating post ${id} with data:`, postData);
+    try {
+      // Step 1: Get the current post data
+      const currentPost = await this.getPostById(id);
+
+      // Step 2: Delete the current post
+      await this.deletePost(id);
+
+      // Step 3: Create a new post with merged data
+      const mergedData = {
+        ...currentPost,
+        ...postData,
+        // Make sure these are properly formatted
+        startDate: postData.startDate || currentPost.startDate,
+        endDate: postData.endDate || currentPost.endDate,
+        price: postData.price ?? currentPost.price,
+        maxSeats: postData.maxSeats ?? currentPost.maxSeats,
+        bookedSeats: postData.bookedSeats ?? currentPost.bookedSeats,
+        image: postData.image || currentPost.image,
+        // Preserve the original creation date and likes/comments
+        createdAt: currentPost.createdAt,
+        likes: currentPost.likes || [],
+        comments: currentPost.comments || [],
+      };
+
+      // Remove properties that shouldn't be sent to the server
+      delete mergedData._id;
+      delete mergedData.updatedAt;
+
+      // Create the new post
+      const newPost = await this.createPost(mergedData as CreatePostData);
+      console.log('Post updated successfully (recreated):', newPost);
+      return newPost;
+    } catch (error) {
+      console.error(`Error updating post ${id}:`, error);
+      throw error;
+    }
   }
 
   // Delete a post
@@ -158,6 +146,25 @@ class PostService {
       .then((response) => response.data)
       .catch((error) => {
         console.error(`Error fetching comments for post ${id}:`, error);
+        throw error;
+      });
+  }
+
+  // Upload image
+  uploadImage(formData: FormData) {
+    console.log('Uploading image');
+    return apiClient
+      .post('/file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      .then((response) => {
+        console.log('Image uploaded successfully:', response.data);
+        return response.data;
+      })
+      .catch((error) => {
+        console.error('Error uploading image:', error);
         throw error;
       });
   }

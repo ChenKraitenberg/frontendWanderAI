@@ -1,29 +1,95 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import Footer from '../components/shared/Footer';
-import PostService from '../services/post_service';
+import postService from '../services/post_service';
 
-const AddPost = () => {
+interface FormData {
+  name: string;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  price: number;
+  maxSeats: number;
+  bookedSeats: number;
+  image: string | null;
+  newImage: File | null;
+}
+
+// Define the update data structure
+interface UpdatePostData {
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  price: number;
+  maxSeats: number;
+  bookedSeats: number;
+  image?: string;
+}
+
+const EditPostPage = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
-
-  const [formData, setFormData] = useState({
-    name: '', // Changed from title to name
-    description: '', // Changed from content to description
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    description: '',
     startDate: new Date(),
     endDate: new Date(),
     price: 0,
     maxSeats: 1,
     bookedSeats: 0,
-    image: null as File | null,
+    image: null,
+    newImage: null,
   });
 
-  // Handle image upload
+  // Fetch post data
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (!id) return;
+
+      try {
+        setFetchLoading(true);
+        console.log('Fetching post with ID:', id);
+        const post = await postService.getPostById(id);
+        console.log('Post fetched for editing:', post);
+
+        setFormData({
+          name: post.name || '',
+          description: post.description || '',
+          startDate: post.startDate ? new Date(post.startDate) : new Date(),
+          endDate: post.endDate ? new Date(post.endDate) : new Date(),
+          price: post.price || 0,
+          maxSeats: post.maxSeats || 1,
+          bookedSeats: post.bookedSeats || 0,
+          image: post.image || null,
+          newImage: null,
+        });
+
+        // Set image preview if it exists
+        if (post.image) {
+          const imageUrl = post.image.startsWith('http') ? post.image : `http://localhost:3060/uploads/${post.image.replace('public/uploads/', '')}`;
+          setSelectedImages([imageUrl]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch post:', error);
+        alert('Failed to load post data. Please try again.');
+        navigate('/profile');
+      } finally {
+        setFetchLoading(false);
+      }
+    };
+
+    fetchPost();
+  }, [id, navigate]);
+
+  // Handle image change
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      setFormData((prev) => ({ ...prev, image: file }));
+      setFormData((prev) => ({ ...prev, newImage: file }));
 
       // Display image preview
       const fileURL = URL.createObjectURL(file);
@@ -31,30 +97,16 @@ const AddPost = () => {
     }
   };
 
-  // Submit the form
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id) return;
+
     setLoading(true);
 
     try {
-      // Validate required fields
-      if (!formData.image) {
-        throw new Error('Please select an image');
-      }
-      if (!formData.name || !formData.description) {
-        throw new Error('Please fill all required fields');
-      }
-
-      // Upload image
-      const imageFormData = new FormData();
-      imageFormData.append('file', formData.image);
-
-      console.log('Uploading image...');
-      const uploadResponse = await PostService.uploadImage(imageFormData);
-      console.log('Image uploaded successfully:', uploadResponse);
-
-      // Create post
-      const postData = {
+      // Prepare update data
+      const updateData: UpdatePostData = {
         name: formData.name,
         description: formData.description,
         startDate: formData.startDate.toISOString(),
@@ -62,27 +114,44 @@ const AddPost = () => {
         price: Number(formData.price),
         maxSeats: Number(formData.maxSeats),
         bookedSeats: Number(formData.bookedSeats),
-        image: uploadResponse.url,
       };
 
-      console.log('Creating post with data:', postData);
-      const createdPost = await PostService.createPost(postData);
-      console.log('Post created successfully:', createdPost);
+      // If there's a new image, upload it first
+      if (formData.newImage) {
+        const imageFormData = new FormData();
+        imageFormData.append('file', formData.newImage);
 
-      // Navigate back
-      navigate('/profile');
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Failed to create post:', error.message);
-        alert(error.message);
-      } else {
-        console.error('Failed to create post:', error);
-        alert('An unknown error occurred');
+        console.log('Uploading new image...');
+        const uploadResponse = await postService.uploadImage(imageFormData);
+        console.log('New image uploaded successfully:', uploadResponse);
+
+        updateData.image = uploadResponse.url;
       }
+
+      // Update the post
+      console.log('Updating post with data:', updateData);
+      await postService.updatePost(id, updateData);
+      console.log('Post updated successfully');
+
+      // Navigate back to profile
+      navigate('/profile');
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      alert('Failed to update post. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (fetchLoading) {
+    return (
+      <div className="min-vh-100 d-flex justify-content-center align-items-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-light">
@@ -94,8 +163,8 @@ const AddPost = () => {
           borderRadius: '0 0 25px 25px',
         }}>
         <div className="container text-center text-white">
-          <h1 className="display-4 fw-bold mb-3">Share Your Adventure</h1>
-          <p className="lead opacity-90 mb-0">Tell us about your amazing trip!</p>
+          <h1 className="display-4 fw-bold mb-3">Edit Your Adventure</h1>
+          <p className="lead opacity-90 mb-0">Update the details of your trip</p>
         </div>
       </div>
 
@@ -131,7 +200,7 @@ const AddPost = () => {
                     )}
                   </div>
 
-                  {/* Trip Details */}
+                  {/* Post Details */}
                   <div className="mb-4">
                     <input
                       type="text"
@@ -205,20 +274,25 @@ const AddPost = () => {
                   </div>
 
                   {/* Submit Button */}
-                  <button
-                    type="submit"
-                    className="btn w-100 text-white rounded-pill py-3"
-                    style={{ background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)', border: 'none' }}
-                    disabled={loading}>
-                    {loading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" />
-                        Creating Trip...
-                      </>
-                    ) : (
-                      'Create Trip'
-                    )}
-                  </button>
+                  <div className="d-flex gap-3">
+                    <button type="button" className="btn flex-grow-1 btn-outline-secondary rounded-pill py-3" onClick={() => navigate('/profile')} disabled={loading}>
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn flex-grow-1 text-white rounded-pill py-3"
+                      style={{ background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)', border: 'none' }}
+                      disabled={loading}>
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Trip'
+                      )}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -231,4 +305,4 @@ const AddPost = () => {
   );
 };
 
-export default AddPost;
+export default EditPostPage;

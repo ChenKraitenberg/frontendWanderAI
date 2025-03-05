@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import tripService from '../services/post_service';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { SavedTrip } from '../types'; // מייבא את הטיפוס הנכון
+import { SavedPost } from '../types';
 
 interface MapComponentProps {
   userId: string;
@@ -26,10 +26,10 @@ const MapComponent: React.FC<MapComponentProps> = ({ userId }) => {
 
         // ממיר את הטיולים למיקומים על המפה
         const tripLocations: Location[] = trips
-          .filter((trip) => {
+          .filter((trip): trip is SavedPost & { destination: string } => {
             // כאן אפשר להוסיף לוגיקה לחילוץ מיקום מה-destination
             // לדוגמה, שימוש ב-geocoding service
-            return trip.destination && trip.title;
+            return trip.destination !== undefined && trip.title !== undefined;
           })
           .map((trip) => ({
             // זה רק לדוגמה - צריך להשתמש בשירות geocoding אמיתי
