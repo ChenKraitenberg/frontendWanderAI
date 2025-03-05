@@ -1,3 +1,4 @@
+// AddPost.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Footer from '../components/shared/Footer';
@@ -32,6 +33,10 @@ const AddPost = () => {
   };
 
   // Submit the form
+  // תיקון לפונקצית createPost בדף AddPost.tsx
+  // עדיף להחליף את כל הפונקציה handleSubmit
+
+  // מתוך src/pages/AddPost.tsx
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -39,21 +44,25 @@ const AddPost = () => {
     try {
       // Validate required fields
       if (!formData.image) {
-        throw new Error('Please select an image');
+        throw new Error('אנא בחר תמונה');
       }
       if (!formData.name || !formData.description) {
-        throw new Error('Please fill all required fields');
+        throw new Error('אנא מלא את כל השדות הנדרשים');
       }
 
       // Upload image
       const imageFormData = new FormData();
       imageFormData.append('file', formData.image);
 
-      console.log('Uploading image...');
+      console.log('מעלה תמונה...');
       const uploadResponse = await PostService.uploadImage(imageFormData);
-      console.log('Image uploaded successfully:', uploadResponse);
+      console.log('התמונה הועלתה בהצלחה:', uploadResponse);
 
-      // Create post
+      // שמירה על מזהה המשתמש הנוכחי
+      const userId = localStorage.getItem('userId');
+      console.log('User ID for new post:', userId);
+
+      // יצירת הפוסט
       const postData = {
         name: formData.name,
         description: formData.description,
@@ -63,21 +72,23 @@ const AddPost = () => {
         maxSeats: Number(formData.maxSeats),
         bookedSeats: Number(formData.bookedSeats),
         image: uploadResponse.url,
+        userId: userId || undefined, // הוספת מזהה המשתמש
+        owner: userId || undefined, // הוספת מזהה המשתמש גם כבעלים
       };
 
-      console.log('Creating post with data:', postData);
+      console.log('יוצר פוסט עם הנתונים:', postData);
       const createdPost = await PostService.createPost(postData);
-      console.log('Post created successfully:', createdPost);
+      console.log('הפוסט נוצר בהצלחה:', createdPost);
 
-      // Navigate back
+      // ניווט בחזרה
       navigate('/profile');
     } catch (error: unknown) {
       if (error instanceof Error) {
-        console.error('Failed to create post:', error.message);
+        console.error('נכשל ביצירת הפוסט:', error.message);
         alert(error.message);
       } else {
-        console.error('Failed to create post:', error);
-        alert('An unknown error occurred');
+        console.error('נכשל ביצירת הפוסט:', error);
+        alert('אירעה שגיאה לא ידועה');
       }
     } finally {
       setLoading(false);

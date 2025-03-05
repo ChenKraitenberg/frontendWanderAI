@@ -7,13 +7,14 @@ export interface User {
   _id?: string;
   email: string;
   password?: string;
+  name?: string; // Added name property
   avatar?: string | null;
 }
 
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string; // לא אופציונלי כי תמיד מגיע
-  _id: string; // לא אופציונלי כי תמיד מגיע
+  refreshToken: string;
+  _id: string;
 }
 
 export interface RegisterResponse {
@@ -25,7 +26,6 @@ class UserService {
   login(email: string, password: string) {
     const abortController = new AbortController();
     const request = apiClient.post<LoginResponse>('/auth/login', { email, password }, { signal: abortController.signal }).then((response) => {
-      // שמירת הטוקנים אוטומטית
       localStorage.setItem('accessToken', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
       localStorage.setItem('userId', response.data._id);
@@ -40,18 +40,15 @@ class UserService {
 
   register(user: User) {
     const abortController = new AbortController();
-    // שליחת הבקשה לשרת
     const request = apiClient
       .post<RegisterResponse>('/auth/register', user, {
         signal: abortController.signal,
       })
       .then((response) => {
-        // בדיקה שאנחנו מקבלים את הטוקן
         if (!response.data.token) {
           throw new Error('No access token received');
         }
 
-        // שמירת הטוקן
         localStorage.setItem('accessToken', response.data.token);
         if (response.data.user._id) {
           localStorage.setItem('userId', response.data.user._id);
@@ -72,7 +69,7 @@ class UserService {
 
   getMe() {
     const token = localStorage.getItem('accessToken');
-    console.log('Token being used:', token); // לבדיקה
+    console.log('Token being used:', token);
 
     const abortController = new AbortController();
     const request = apiClient.get<User>('/auth/me', {
@@ -88,8 +85,6 @@ class UserService {
     };
   }
 
-  // נתקן את הפונקציה uploadImage בUserService
-  // user_service.ts
   uploadImage(img: File) {
     const formData = new FormData();
     formData.append('file', img);
@@ -101,7 +96,7 @@ class UserService {
         signal: abortController.signal,
       })
       .then((response) => {
-        console.log('Full upload response:', response); // לבדיקה
+        console.log('Full upload response:', response);
         return response;
       });
 
@@ -111,18 +106,81 @@ class UserService {
     };
   }
 
-  logout() {
-    const refreshToken = localStorage.getItem('refreshToken');
-    const request = apiClient.post('/auth/logout', { refreshToken }).then(() => {
+  uploadProfileImage(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient
+      .post('/file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      .then((response) => {
+        console.log('Profile image upload response:', response.data);
+        return response.data;
+      })
+      .catch((error) => {
+        console.error('Error uploading profile image:', error);
+        throw error;
+      });
+  }
+
+  updateProfile(userData: Partial<User>) {
+    const token = localStorage.getItem('accessToken');
+
+    return apiClient
+      .put('/auth/me', userData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => {
+        console.log('Profile update response:', response.data);
+        return response.data;
+      })
+      .catch((error) => {
+        console.error('Failed to update profile:', error);
+        throw error;
+      });
+  }
+
+  logout(refreshToken?: string) {
+    const token = refreshToken || localStorage.getItem('refreshToken');
+
+    if (!token) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userId');
-    });
+      return { request: Promise.resolve() };
+    }
+
+    const request = apiClient
+      .post(
+        '/auth/logout',
+        { refreshToken: token },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        }
+      )
+      .then(() => {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userId');
+      })
+      .catch((error) => {
+        console.error('Logout error:', error);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userId');
+        throw error;
+      });
 
     return { request };
   }
-
-  // implement the getCurrentUser function in UserService
 }
 
 export default new UserService();

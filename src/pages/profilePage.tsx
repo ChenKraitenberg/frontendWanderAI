@@ -1,59 +1,78 @@
 // src/pages/profilePage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import userService, { User } from '../services/user_service';
 import postService from '../services/post_service';
 import MapComponent from '../components/MapComponent';
 import Footer from '../components/shared/Footer';
-import { getImageUrl } from '../utils/imageUtils';
 import PostCard from '../components/PostCard';
-import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
+import LogoutButton from '../components/LogoutButton';
 import { Post } from '../types';
+import ProfileImageUploader from '../components/ProfileImageUploader';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [postToDelete, setPostToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  console.log('Rendering ProfilePage component');
+  // Use useCallback to prevent the dependency cycle in useEffect
+  const fetchUserData = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching user data...');
 
+      const { request } = userService.getMe();
+      const response = await request;
+      const userData = response.data;
+      setUser(userData);
+      console.log('User data fetched:', userData);
+
+      return userData;
+    } catch (error) {
+      console.error('Failed to load user profile:', error);
+      navigate('/login');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // Separate function to fetch posts
+  const fetchUserPosts = async (userId: string) => {
+    try {
+      console.log(`Fetching posts for user ID: ${userId}`);
+      const userPosts = await postService.getByUserId(userId);
+      console.log('Posts fetched:', userPosts);
+      setPosts(userPosts);
+    } catch (error) {
+      console.error('Failed to load trips:', error);
+      setPosts([]);
+    }
+  };
+
+  // Function to update profile image in local state
+  const handleProfileImageUpdate = (newImageUrl: string) => {
+    if (user) {
+      setUser({
+        ...user,
+        avatar: newImageUrl,
+      });
+    }
+  };
+
+  // Use a single useEffect with the proper dependency
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        console.log('Fetching user data...');
-
-        const { request } = userService.getMe();
-        const response = await request;
-        const userData = response.data;
-        setUser(userData);
-        console.log('User data fetched:', userData);
-
-        if (userData._id) {
-          try {
-            console.log(`Fetching posts for user ID: ${userData._id}`);
-            const userPosts = await postService.getByUserId(userData._id);
-            console.log('Posts fetched:', userPosts);
-            setPosts(userPosts);
-          } catch (error) {
-            console.error('Failed to load trips:', error);
-            setPosts([]);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load profile:', error);
-        navigate('/login');
-      } finally {
-        setLoading(false);
+    const loadData = async () => {
+      const userData = await fetchUserData();
+      if (userData?._id) {
+        await fetchUserPosts(userData._id);
       }
     };
 
-    fetchData();
-  }, [navigate]);
+    loadData();
+  }, [fetchUserData]);
 
   const calculateTotalDays = () => {
     return posts.reduce((total, post) => {
@@ -67,64 +86,58 @@ const ProfilePage: React.FC = () => {
     }, 0);
   };
 
-  const handleDownloadPost = (post: Post) => {
-    try {
-      const fileContent = `${post.title}\n\n${post.description}\n\n${post.itinerary?.join('\n\n') || ''}
-        \nPost Details:
-        - Duration: ${post.duration} days
-        - Category: ${post.category}`;
-
-      const element = document.createElement('a');
-      const file = new Blob([fileContent], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = `${post.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-      toast.success('Post downloaded successfully');
-    } catch (error) {
-      console.error('Failed to download post:', error);
-      toast.error('Failed to download post');
-    }
-  };
-
   const handleEditPost = (postId: string) => {
+    if (!postId) {
+      console.error('Invalid post ID for editing');
+      return;
+    }
     console.log(`Navigating to edit post: ${postId}`);
     navigate(`/edit-post/${postId}`);
   };
 
   const handleDeletePost = async (postId: string) => {
-    console.log(`Deleting post: ${postId}`);
+    if (!postId) {
+      console.error('Invalid post ID for deletion');
+      return;
+    }
+
     try {
-      setIsDeleting(true);
+      console.log(`Attempting to delete post with ID: ${postId}`);
       await postService.deletePost(postId);
-      setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+      console.log('Post deleted successfully, updating state');
+      setPosts((currentPosts) => currentPosts.filter((post) => post._id !== postId));
       toast.success('Post deleted successfully');
-      setPostToDelete(null);
     } catch (error) {
-      console.error('Failed to delete post:', error);
-      toast.error('Failed to delete post');
-    } finally {
-      setIsDeleting(false);
+      console.error('Error details when deleting post:', error);
+      toast.error('Error deleting post');
     }
   };
 
   const handleLikePost = async (postId: string) => {
+    if (!postId) {
+      console.error('Invalid post ID for like operation');
+      return;
+    }
+
     try {
       await postService.likePost(postId);
 
-      // Refresh the specific post after liking
+      // Update the specific post instead of reloading all posts
       const updatedPost = await postService.getPostById(postId);
       setPosts((prevPosts) => prevPosts.map((post) => (post._id === postId ? updatedPost : post)));
 
-      toast.success('Trip liked!');
+      toast.success('Post liked!');
     } catch (error) {
-      console.error('Error liking trip:', error);
-      toast.error('Could not like trip. Please try again.');
+      console.error('Error liking post:', error);
+      toast.error('Error liking post');
     }
   };
 
   const handleCommentClick = (postId: string) => {
+    if (!postId) {
+      console.error('Invalid post ID for comment navigation');
+      return;
+    }
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };
 
@@ -152,20 +165,25 @@ const ProfilePage: React.FC = () => {
           <div className="row align-items-center">
             <div className="col-auto">
               <div className="position-relative">
-                <div
-                  className="rounded-4 shadow-lg border-4 border-white"
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    backgroundImage: user?.avatar ? `url(${getImageUrl(user.avatar)})` : 'url(/api/placeholder/120/120)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
+                {user?._id ? (
+                  <ProfileImageUploader currentImage={user.avatar || null} userId={user._id} onImageUpdate={handleProfileImageUpdate} />
+                ) : (
+                  <div
+                    className="rounded-4 shadow-lg border-4 border-white"
+                    style={{
+                      width: '120px',
+                      height: '120px',
+                      backgroundImage: 'url(/api/placeholder/120/120)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  />
+                )}
               </div>
             </div>
             <div className="col text-white">
-              <h1 className="display-6 fw-bold mb-2">{user?.email}</h1>
+              {/* Use name instead of email when available */}
+              <h1 className="display-6 fw-bold mb-2">{user?.name || user?.email}</h1>
               <div className="d-flex gap-4">
                 <div>
                   <div className="fw-bold h4 mb-0">{posts.length}</div>
@@ -176,6 +194,9 @@ const ProfilePage: React.FC = () => {
                   <small className="opacity-75">Travel Days</small>
                 </div>
               </div>
+            </div>
+            <div className="col-auto">
+              <LogoutButton variant="outline" className="px-4 py-2" localOnly={true} />
             </div>
           </div>
         </div>
@@ -211,13 +232,14 @@ const ProfilePage: React.FC = () => {
             {posts.length > 0 ? (
               <div className="row g-4">
                 {posts.map((post) => (
-                  <div key={post._id} className="col-md-6 col-lg-4">
+                  <div key={`post-container-${post._id}`} className="col-md-6 col-lg-4">
                     <PostCard
+                      key={`post-${post._id}`}
                       post={post}
-                      onLike={() => handleLikePost(post._id)}
-                      onCommentClick={() => handleCommentClick(post._id)}
-                      onEdit={() => handleEditPost(post._id)}
-                      onDelete={() => setPostToDelete(post._id)}
+                      onLike={() => post._id && handleLikePost(post._id)}
+                      onCommentClick={() => post._id && handleCommentClick(post._id)}
+                      onEdit={() => post._id && handleEditPost(post._id)}
+                      onDelete={() => post._id && handleDeletePost(post._id)}
                       showActions={true}
                     />
                   </div>
@@ -232,16 +254,6 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={!!postToDelete}
-        onClose={() => setPostToDelete(null)}
-        onConfirm={() => postToDelete && handleDeletePost(postToDelete)}
-        isDeleting={isDeleting}
-        title="Delete Trip"
-        message="Are you sure you want to delete this trip? This action cannot be undone."
-      />
 
       <Footer />
     </div>

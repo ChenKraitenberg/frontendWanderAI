@@ -108,11 +108,20 @@ class PostService {
 
   // Delete a post
   deletePost(id: string) {
+    console.log(`Attempting to delete post with ID: ${id}`);
+
     return apiClient
       .delete(`/posts/${id}`)
-      .then((response) => response.data)
+      .then((response) => {
+        console.log(`Successfully deleted post ${id}:`, response.data);
+        return response.data;
+      })
       .catch((error) => {
-        console.error(`Error deleting post ${id}:`, error);
+        console.error(`Error details for deleting post ${id}:`, {
+          status: error.response?.status,
+          message: error.response?.data,
+          error: error.message,
+        });
         throw error;
       });
   }
@@ -170,7 +179,7 @@ class PostService {
   }
 
   getByUserId(userId: string) {
-    return apiClient.get<Post[]>(`/posts?userId=${userId}`).then((res) => res.data);
+    return apiClient.get<Post[]>(`/posts?owner=${userId}`).then((res) => res.data);
   }
 
   savePost(postData: Post) {

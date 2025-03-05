@@ -12,6 +12,7 @@ import SharePost from '../pages/AddPost';
 import EditPostPage from '../pages/EditPostPage';
 import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import '../styles/visual-enhancements.css';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

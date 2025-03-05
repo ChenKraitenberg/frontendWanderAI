@@ -3,13 +3,11 @@ import { FC, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import userService, { User } from '../services/user_service';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 
 interface FormData {
   email: string;
   password: string;
   name: string;
-  //img: File[];
   img?: FileList;
 }
 
@@ -35,52 +33,49 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
   const inputFileRef: { current: HTMLInputElement | null } = { current: null };
 
   // הרגע שבו המשתמש לוחץ על כפתור הרישום
+  // בתוך onSubmit בטופס הרשמה (RegistrationForm.tsx)
   const onSubmit = async (data: FormData) => {
     setLoading(true);
 
     try {
-      // Upload the image to the server
-      //const uploadResponse = await userService.uploadImage(data.img?.[0]);
+      let avatarUrl = null;
 
-      // Register the user
+      // העלאת תמונה אם נבחרה
+      if (data.img && data.img.length > 0) {
+        try {
+          // העלאת התמונה לשרת
+          const uploadResponse = await userService.uploadProfileImage(data.img[0]);
+          avatarUrl = uploadResponse.url;
+          console.log('Image uploaded successfully, URL:', avatarUrl);
+        } catch (error) {
+          console.error('Failed to upload profile image:', error);
+          // ממשיכים עם הרשמה גם אם העלאת התמונה נכשלה
+        }
+      }
+
+      // רישום המשתמש
       const user: User = {
         email: data.email,
         password: data.password,
+        name: data.name,
+
+        avatar: avatarUrl, // הוספת URL התמונה לאובייקט המשתמש
       };
-      console.log('Sending registration request with:', user);
+
+      console.log('Registering user with data:', { ...user, password: '***' });
 
       const { request: registerRequest } = await userService.register(user);
       const registerResponse = await registerRequest;
-      localStorage.setItem('accessToken', registerResponse.data.token);
-      localStorage.setItem('isNewUser', 'true'); // הוספת משתנה חדש שמסמן שמשתמש נרשם
 
-      alert('Registration successful!');
+      localStorage.setItem('accessToken', registerResponse.data.token);
+      if (registerResponse.data.user._id) {
+        localStorage.setItem('userId', registerResponse.data.user._id);
+      }
+
       onRegisterSuccess();
       navigate('/');
-    } catch (error: unknown) {
-      // 1. בדיקה אם השגיאה הגיעה מ-Axios
-      if (axios.isAxiosError(error)) {
-        // 2. ננסה לשלוף את ההודעה מהשרת
-        const serverMessage = error.response?.data?.message;
-
-        if (serverMessage) {
-          // לדוגמה, אם קיבלת { message: "User already exists" }
-          alert(serverMessage);
-        } else {
-          // אם לא קיים message בתשובת השרת, נ fallback להודעה כללית
-          alert('Registration failed. Please try again.');
-        }
-      }
-      // אם זו לא שגיאת Axios אבל עדיין Error
-      else if (error instanceof Error) {
-        console.error('Registration failed:', error.message);
-        alert(error.message || 'Registration failed. Please try again.');
-      }
-      // אם זה בכלל לא Error טיפוסי
-      else {
-        console.error('An unexpected error occurred:', error);
-        alert('An unexpected error occurred. Please try again.');
-      }
+    } catch (error) {
+      console.error('Registration failed:', error);
     } finally {
       setLoading(false);
     }

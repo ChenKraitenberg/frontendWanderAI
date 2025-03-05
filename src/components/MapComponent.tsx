@@ -11,7 +11,7 @@ interface Location {
   lat: number;
   lng: number;
   title: string;
-  destination: string; // הוספנו שדה חדש
+  destination: string;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({ userId }) => {

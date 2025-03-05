@@ -22,6 +22,7 @@ interface Post {
   user?: {
     _id: string;
     email: string;
+    name?: string;
     avatar?: string;
   };
   likes: string[];
@@ -38,14 +39,7 @@ interface PostCardProps {
   showActions?: boolean;
 }
 
-const PostCard: React.FC<PostCardProps> = ({
-  post,
-  onLike,
-  onCommentClick,
-  onDelete,
-  onEdit,
-  showActions = true, // Changed default to true
-}) => {
+const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDelete, onEdit, showActions = true }) => {
   const navigate = useNavigate();
   const userId = localStorage.getItem('userId');
   const isOwner = userId === post.userId;
@@ -115,10 +109,10 @@ const PostCard: React.FC<PostCardProps> = ({
         {/* User Info Header */}
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img src={post.user?.avatar ? getImageUrl(post.user.avatar) : '/api/placeholder/45/45'} alt="User" className="rounded-circle" width="45" height="45" />
+            <img src={post.user?.avatar ? getImageUrl(post.user.avatar) : '/api/placeholder/45/45'} alt={post.user?.name || 'User'} className="rounded-circle" width="45" height="45" />
           </div>
           <div>
-            <h6 className="mb-0 fw-bold">{post.user?.email || 'Travel Enthusiast'}</h6>
+            <h6 className="mb-0 fw-bold">{post.user?.name || post.user?.email || 'Anonymous'}</h6>
             <small className="text-muted">{formatDate(post.createdAt)}</small>
           </div>
 
