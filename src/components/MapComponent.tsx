@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import tripService from '../services/trip_service';
+import tripService from '../services/post_service';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { SavedTrip } from '../types'; // מייבא את הטיפוס הנכון
 

@@ -2,14 +2,15 @@
 import React, { useState } from 'react';
 import MainLayout from '../components/layouts/MainLayout';
 import { toast } from 'react-toastify';
-import { TripPreferences, GeneratedTrip, ApiError } from '../types';
+import { PostPreferences, GeneratedPost, ApiError, SavedPost } from '../types';
 import aiService from '../services/ai_service';
-import tripService from '../services/trip_service';
+import post_service from '../services/post_service';
+import { Post } from '../types';
 
 const GenerateTrip = () => {
   const [loading, setLoading] = useState(false);
-  const [generatedTrip, setGeneratedTrip] = useState<GeneratedTrip | null>(null);
-  const [preferences, setPreferences] = useState<TripPreferences>({
+  const [generatedTrip, setGeneratedTrip] = useState<GeneratedPost | null>(null);
+  const [preferences, setPreferences] = useState<PostPreferences>({
     destination: '',
     duration: '3',
     category: 'RELAXED', // שינוי מ-style ל-category
@@ -59,7 +60,8 @@ const GenerateTrip = () => {
         return;
       }
 
-      const tripToSave = {
+      const tripToSave: Post = {
+        _id: '',
         title: generatedTrip.title,
         description: generatedTrip.description,
         itinerary: generatedTrip.itinerary,
@@ -68,18 +70,25 @@ const GenerateTrip = () => {
         startDate: new Date(),
         endDate: new Date(new Date().setDate(new Date().getDate() + parseInt(preferences.duration))),
         price: 0,
-        maxParticipants: 10,
-        currentParticipants: 0,
-        imageUrl: 'https://via.placeholder.com/800x400',
+        //maxParticipants: 10,
+        //currentParticipants: 0,
+        image: 'https://via.placeholder.com/800x400',
         category: preferences.category as 'RELAXED' | 'MODERATE' | 'INTENSIVE',
-        likes: 0,
+        likes: [],
+        comments: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-        interests: preferences.interests || [],
+        preferences: {
+          destination: preferences.destination,
+          duration: preferences.duration,
+          category: preferences.category,
+          interests: preferences.interests || [],
+        },
+        // interests: preferences.interests || [],
       };
 
       console.log('About to save trip:', JSON.stringify(tripToSave, null, 2));
-      await tripService.saveTrip(tripToSave);
+      await post_service.savePost(tripToSave);
       toast.success('הטיול נשמר בהצלחה!');
     } catch (error) {
       const apiError = error as ApiError;
@@ -98,29 +107,25 @@ const GenerateTrip = () => {
     }
   };
 
-  const handleDownloadTrip = () => {
-    if (!generatedTrip) return;
+  const handleDownloadPost = (post: SavedPost) => {
+    try {
+      const fileContent = `${post.title}\n\n${post.description}\n\n${post.itinerary?.join('\n\n') || ''}
+        \nPost Details:
+        - Duration: ${post.duration} days
+        - Category: ${post.category}`;
 
-    const fileContent = `${generatedTrip.title}
-
-${generatedTrip.description}
-
-${generatedTrip.itinerary.join('\n\n')}
-
-TRIP DETAILS:
-- Destination: ${preferences.destination}
-- Duration: ${preferences.duration} days
-- Budget: ${preferences.category}
-- Interests: ${(preferences.interests || []).join(', ')}
-`;
-
-    const element = document.createElement('a');
-    const file = new Blob([fileContent], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `${generatedTrip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+      const element = document.createElement('a');
+      const file = new Blob([fileContent], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = `${post.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      toast.success('Post downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download post:', error);
+      toast.error('Failed to download post');
+    }
   };
 
   return (
@@ -252,46 +257,50 @@ TRIP DETAILS:
                     <p className="lead text-muted mb-4">{generatedTrip.description}</p>
 
                     <div className="d-flex flex-column gap-4 mb-4">
-                      {generatedTrip.itinerary.map((day, index) => (
-                        <div key={index} className="bg-light rounded-4 p-4">
-                          {day.split('\n').map((line, lineIndex) => {
-                            if (line.toLowerCase().startsWith('day')) {
+                      {generatedTrip.itinerary &&
+                        generatedTrip.itinerary.map((day, index) => (
+                          <div key={index} className="bg-light rounded-4 p-4">
+                            {day.split('\n').map((line, lineIndex) => {
+                              if (line.toLowerCase().startsWith('day')) {
+                                return (
+                                  <h3 key={lineIndex} className="h5 fw-bold mb-3" style={{ color: '#4158D0' }}>
+                                    {line}
+                                  </h3>
+                                );
+                              }
+                              if (['morning:', 'afternoon:', 'evening:'].some((s) => line.toLowerCase().startsWith(s.toLowerCase()))) {
+                                return (
+                                  <div key={lineIndex} className="fw-semibold mb-2" style={{ color: '#C850C0' }}>
+                                    {line}
+                                  </div>
+                                );
+                              }
+                              if (line.startsWith('-')) {
+                                return (
+                                  <div key={lineIndex} className="d-flex align-items-start ms-4 mb-2">
+                                    <span className="me-2" style={{ color: '#C850C0' }}>
+                                      •
+                                    </span>
+                                    <span>{line.replace('-', '').trim()}</span>
+                                  </div>
+                                );
+                              }
                               return (
-                                <h3 key={lineIndex} className="h5 fw-bold mb-3" style={{ color: '#4158D0' }}>
+                                <p key={lineIndex} className="ms-4 mb-2 text-muted">
                                   {line}
-                                </h3>
+                                </p>
                               );
-                            }
-                            if (['morning:', 'afternoon:', 'evening:'].some((s) => line.toLowerCase().startsWith(s.toLowerCase()))) {
-                              return (
-                                <div key={lineIndex} className="fw-semibold mb-2" style={{ color: '#C850C0' }}>
-                                  {line}
-                                </div>
-                              );
-                            }
-                            if (line.startsWith('-')) {
-                              return (
-                                <div key={lineIndex} className="d-flex align-items-start ms-4 mb-2">
-                                  <span className="me-2" style={{ color: '#C850C0' }}>
-                                    •
-                                  </span>
-                                  <span>{line.replace('-', '').trim()}</span>
-                                </div>
-                              );
-                            }
-                            return (
-                              <p key={lineIndex} className="ms-4 mb-2 text-muted">
-                                {line}
-                              </p>
-                            );
-                          })}
-                        </div>
-                      ))}
+                            })}
+                          </div>
+                        ))}
                     </div>
 
                     {/* Action Buttons */}
                     <div className="d-flex justify-content-end gap-3">
-                      <button className="btn btn-outline-primary rounded-pill px-4" onClick={handleDownloadTrip} style={{ borderColor: '#4158D0', color: '#4158D0' }}>
+                      <button
+                        className="btn btn-outline-primary rounded-pill px-4"
+                        onClick={() => handleDownloadPost(generatedTrip as unknown as SavedPost)}
+                        style={{ borderColor: '#4158D0', color: '#4158D0' }}>
                         <span className="me-2">💾</span>
                         Save to Computer
                       </button>

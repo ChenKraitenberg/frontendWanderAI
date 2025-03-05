@@ -2,20 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import userService, { User } from '../services/user_service';
-import tripService from '../services/trip_service';
+import post_service from '../services/post_service';
 import MapComponent from '../components/MapComponent';
 import Footer from '../components/shared/Footer';
 import { getImageUrl } from '../utils/imageUtils';
-import { SavedTrip } from '../types';
-import TripCard from '../components/TripCard';
+import PostCard from '../components/PostCard';
 import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
+import { SavedPost } from '../types';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [trips, setTrips] = useState<SavedTrip[]>([]);
+  const [posts, setPosts] = useState<SavedPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tripToDelete, setTripToDelete] = useState<string | null>(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,12 +28,12 @@ const ProfilePage: React.FC = () => {
 
         if (response.data._id) {
           try {
-            const userTrips = await tripService.getByUserId(response.data._id);
-            //setTrips(Array.isArray(userTrips) ? userTrips : []);
-            setTrips(userTrips);
+            const userPosts = await post_service.getByUserId(response.data._id);
+
+            setPosts(userPosts);
           } catch (error) {
             console.error('Failed to load trips:', error);
-            setTrips([]);
+            setPosts([]);
           }
         }
       } catch (error) {
@@ -48,10 +48,10 @@ const ProfilePage: React.FC = () => {
   }, [navigate]);
 
   const calculateTotalDays = () => {
-    return trips.reduce((total, trip) => {
-      if (trip.startDate && trip.endDate) {
-        const start = new Date(trip.startDate);
-        const end = new Date(trip.endDate);
+    return posts.reduce((total, post) => {
+      if (post.startDate && post.endDate) {
+        const start = new Date(post.startDate);
+        const end = new Date(post.endDate);
         const diffTime = Math.abs(end.getTime() - start.getTime());
         return total + Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       }
@@ -59,36 +59,36 @@ const ProfilePage: React.FC = () => {
     }, 0);
   };
 
-  const handleDeleteTrip = async (tripId: string) => {
+  const handleDownloadPost = (post: SavedPost) => {
     try {
-      await tripService.deletePost(tripId);
-      setTrips((prevTrips) => prevTrips.filter((trip) => trip._id !== tripId));
-      toast.success('Trip deleted successfully');
-      setTripToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete trip:', error);
-      toast.error('Failed to delete trip');
-    }
-  };
-
-  const handleDownloadTrip = (trip: SavedTrip) => {
-    try {
-      const fileContent = `${trip.title}\n\n${trip.description}\n\n${trip.itinerary.join('\n\n')}
-        \nTrip Details:
-        - Duration: ${trip.duration} days
-        - Category: ${trip.category}`;
+      const fileContent = `${post.title}\n\n${post.description}\n\n${post.itinerary?.join('\n\n') || ''}
+        \nPost Details:
+        - Duration: ${post.duration} days
+        - Category: ${post.category}`;
 
       const element = document.createElement('a');
       const file = new Blob([fileContent], { type: 'text/plain' });
       element.href = URL.createObjectURL(file);
-      element.download = `${trip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+      element.download = `${post.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
-      toast.success('Trip downloaded successfully');
+      toast.success('Post downloaded successfully');
     } catch (error) {
-      console.error('Failed to download trip:', error);
-      toast.error('Failed to download trip');
+      console.error('Failed to download post:', error);
+      toast.error('Failed to download post');
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await post_service.deletePost(postId);
+      setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+      toast.success('Post deleted successfully');
+      setPostToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      toast.error('Failed to delete post');
     }
   };
 
@@ -132,7 +132,7 @@ const ProfilePage: React.FC = () => {
               <h1 className="display-6 fw-bold mb-2">{user?.email}</h1>
               <div className="d-flex gap-4">
                 <div>
-                  <div className="fw-bold h4 mb-0">{trips.length}</div>
+                  <div className="fw-bold h4 mb-0">{posts.length}</div>
                   <small className="opacity-75">Trips Planned</small>
                 </div>
                 <div>
@@ -172,11 +172,17 @@ const ProfilePage: React.FC = () => {
               </button>
             </div>
 
-            {trips.length > 0 ? (
+            {posts.length > 0 ? (
               <div className="row g-4">
-                {trips.map((trip) => (
-                  <div key={trip._id} className="col-md-6 col-lg-4">
-                    <TripCard trip={trip} onDelete={() => setTripToDelete(trip._id)} onDownload={() => handleDownloadTrip(trip)} />
+                {posts.map((post) => (
+                  <div key={post._id} className="col-md-6 col-lg-4">
+                    <PostCard
+                      post={post}
+                      onDownload={() => handleDownloadPost(post)}
+                      onDelete={() => setPostToDelete(post._id)}
+                      onLike={() => console.log('Liked post', post._id)}
+                      onCommentClick={() => console.log('Comment clicked for post', post._id)}
+                    />
                   </div>
                 ))}
               </div>
@@ -190,7 +196,7 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      <DeleteConfirmationDialog isOpen={!!tripToDelete} onClose={() => setTripToDelete(null)} onConfirm={() => tripToDelete && handleDeleteTrip(tripToDelete)} />
+      <DeleteConfirmationDialog isOpen={!!postToDelete} onClose={() => setPostToDelete(null)} onConfirm={() => postToDelete && handleDeletePost(postToDelete)} />
 
       <Footer />
     </div>

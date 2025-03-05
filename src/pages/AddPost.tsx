@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Footer from '../components/shared/Footer';
 //import PostService from '../services/post_service';
-import TripService from '../services/trip_service';
+import TripService from '../services/post_service';
 
 interface TripPost {
   name: string;
