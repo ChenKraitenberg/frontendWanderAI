@@ -1,8 +1,10 @@
-// RegisteringForm.tsx
+// src/pages/RegistrationForm.tsx
 import { FC, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import userService, { User } from '../services/user_service';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import SocialLoginButtons from '../components/SocialLoginButtons';
+import { useAuth } from '../context/AuthContext';
+import userService from '../services/user_service';
 
 interface FormData {
   email: string;
@@ -11,16 +13,14 @@ interface FormData {
   img?: FileList;
 }
 
-// הגדרת הפרופס שכולל את onRegisterSuccess
-interface RegistrationFormProps {
-  onRegisterSuccess: () => void;
-}
-
-const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
+const RegistrationForm: FC = () => {
   const navigate = useNavigate();
+  const { register: registerUser, isAuthenticated, loading: authLoading, error: authError } = useAuth();
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const {
     register,
@@ -29,63 +29,55 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
     formState: { errors },
   } = useForm<FormData>();
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
+
   const [img] = watch(['img']);
   const inputFileRef: { current: HTMLInputElement | null } = { current: null };
 
-  // הרגע שבו המשתמש לוחץ על כפתור הרישום
-  // בתוך onSubmit בטופס הרשמה (RegistrationForm.tsx)
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
-
-    try {
-      let avatarUrl = null;
-
-      // העלאת תמונה אם נבחרה
-      if (data.img && data.img.length > 0) {
+  // Handle image upload
+  useEffect(() => {
+    const uploadImage = async () => {
+      if (img?.[0]) {
         try {
-          // העלאת התמונה לשרת
-          const uploadResponse = await userService.uploadProfileImage(data.img[0]);
-          avatarUrl = uploadResponse.url;
-          console.log('Image uploaded successfully, URL:', avatarUrl);
+          setSelectedImage(img[0]);
+          setImageUploading(true);
+
+          // Upload the image
+          const uploadResponse = await userService.uploadProfileImage(img[0]);
+          setUploadedImageUrl(uploadResponse.url);
         } catch (error) {
           console.error('Failed to upload profile image:', error);
-          // ממשיכים עם הרשמה גם אם העלאת התמונה נכשלה
+        } finally {
+          setImageUploading(false);
         }
       }
+    };
 
-      // רישום המשתמש
-      const user: User = {
-        email: data.email,
-        password: data.password,
-        name: data.name,
+    if (img?.[0]) {
+      uploadImage();
+    }
+  }, [img]);
 
-        avatar: avatarUrl, // הוספת URL התמונה לאובייקט המשתמש
-      };
+  const onSubmit = async (data: FormData) => {
+    try {
+      setLoading(true);
 
-      console.log('Registering user with data:', { ...user, password: '***' });
+      // Register with auth context
+      await registerUser(data.email, data.password, data.name, uploadedImageUrl || undefined);
 
-      const { request: registerRequest } = await userService.register(user);
-      const registerResponse = await registerRequest;
-
-      localStorage.setItem('accessToken', registerResponse.data.token);
-      if (registerResponse.data.user._id) {
-        localStorage.setItem('userId', registerResponse.data.user._id);
-      }
-
-      onRegisterSuccess();
-      navigate('/');
+      // Navigation is handled by the useEffect that watches isAuthenticated
     } catch (error) {
-      console.error('Registration failed:', error);
+      console.error('Registration form error:', error);
+      // Auth context already shows error toast
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (img?.[0]) {
-      setSelectedImage(img[0]);
-    }
-  }, [img]);
 
   const { ref, ...restRegisterParams } = register('img');
 
@@ -111,11 +103,18 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
             <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
               <div className="card-body p-4">
                 <form onSubmit={handleSubmit(onSubmit)}>
+                  {/* Show auth error if present */}
+                  {authError && (
+                    <div className="alert alert-danger" role="alert">
+                      {authError}
+                    </div>
+                  )}
+
                   {/* Profile Image Section */}
                   <div className="text-center mb-4">
                     <div className="position-relative d-inline-block" style={{ cursor: 'pointer' }} onClick={() => inputFileRef.current?.click()}>
                       <div
-                        className="rounded-circle mb-3 mx-auto"
+                        className="rounded-circle mb-3 mx-auto position-relative"
                         style={{
                           width: '120px',
                           height: '120px',
@@ -124,8 +123,15 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
                           backgroundPosition: 'center',
                           border: '4px solid white',
                           boxShadow: '0 0 20px rgba(0,0,0,0.1)',
-                        }}
-                      />
+                        }}>
+                        {imageUploading && (
+                          <div className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-dark bg-opacity-50 rounded-circle">
+                            <div className="spinner-border text-light" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="position-absolute bottom-0 end-0 bg-white rounded-circle p-2 shadow-sm" style={{ transform: 'translate(20%, 20%)' }}>
                         📸
                       </div>
@@ -147,51 +153,59 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
                   <div className="mb-4">
                     <label className="form-label">Full Name</label>
                     <input
-                      {...register('name', { required: true })}
+                      {...register('name', {
+                        required: 'Name is required',
+                      })}
                       type="text"
                       className={`form-control form-control-lg rounded-pill ${errors.name ? 'is-invalid' : ''}`}
                       placeholder="Enter your full name"
                     />
-                    {errors.name && <div className="invalid-feedback">Name is required</div>}
+                    {errors.name && <div className="invalid-feedback">{errors.name.message}</div>}
                   </div>
 
                   <div className="mb-4">
                     <label className="form-label">Email</label>
                     <input
                       {...register('email', {
-                        required: true,
-                        pattern: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        required: 'Email is required',
+                        pattern: {
+                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                          message: 'Please enter a valid email address',
+                        },
                       })}
                       type="email"
                       className={`form-control form-control-lg rounded-pill ${errors.email ? 'is-invalid' : ''}`}
                       placeholder="Enter your email"
                     />
-                    {errors.email && <div className="invalid-feedback">Please enter a valid email</div>}
+                    {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
                   </div>
 
                   <div className="mb-4">
                     <label className="form-label">Password</label>
                     <input
                       {...register('password', {
-                        required: true,
-                        minLength: 6,
+                        required: 'Password is required',
+                        minLength: {
+                          value: 6,
+                          message: 'Password must be at least 6 characters',
+                        },
                       })}
                       type="password"
                       className={`form-control form-control-lg rounded-pill ${errors.password ? 'is-invalid' : ''}`}
                       placeholder="Create a password"
                     />
-                    {errors.password && <div className="invalid-feedback">Password must be at least 6 characters</div>}
+                    {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
                   </div>
 
                   <button
                     type="submit"
-                    className="btn w-100 text-white rounded-pill py-3"
+                    className="btn w-100 text-white rounded-pill py-3 mb-4"
                     style={{
                       background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)',
                       border: 'none',
                     }}
-                    disabled={loading}>
-                    {loading ? (
+                    disabled={loading || authLoading || imageUploading}>
+                    {loading || authLoading ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                         Creating your account...
@@ -201,12 +215,20 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
                     )}
                   </button>
 
+                  {/* Social Login Options */}
+                  <div className="mb-4">
+                    <div className="text-center mb-3">
+                      <p className="text-muted">Or sign up with</p>
+                    </div>
+                    <SocialLoginButtons />
+                  </div>
+
                   <div className="text-center mt-4">
                     <p className="text-muted mb-0">
                       Already have an account?{' '}
-                      <a href="/login" className="text-decoration-none">
+                      <Link to="/login" className="text-decoration-none">
                         Sign in
-                      </a>
+                      </Link>
                     </p>
                   </div>
                 </form>
@@ -215,6 +237,27 @@ const RegistrationForm: FC<RegistrationFormProps> = ({ onRegisterSuccess }) => {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="py-3 bg-white border-top mt-auto">
+        <div className="container">
+          <div className="row justify-content-around align-items-center g-3">
+            {[
+              { icon: '🏠', label: 'Home' },
+              { icon: '🔍', label: 'Search' },
+              { icon: '❤️', label: 'Favorites' },
+              { icon: '👤', label: 'Profile' },
+            ].map((item, index) => (
+              <div key={index} className="col-3 text-center">
+                <button className="btn btn-link text-dark p-0 d-flex flex-column align-items-center gap-1 text-decoration-none">
+                  <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
+                  <small className="text-muted">{item.label}</small>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

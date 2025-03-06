@@ -196,7 +196,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
             <div className="col-auto">
-              <LogoutButton variant="outline" className="px-4 py-2" localOnly={true} />
+              <LogoutButton variant="outline" className="px-4 py-2" />
             </div>
           </div>
         </div>

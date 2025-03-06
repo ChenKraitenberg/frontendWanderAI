@@ -8,6 +8,5 @@ dotenv.config();
 
 export default defineConfig({
   plugins: [react()],
-  // הוספת הגדרות envPrefix כדי לוודא שVite מזהה את המשתנים
   envPrefix: 'VITE_',
 });

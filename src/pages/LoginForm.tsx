@@ -1,43 +1,41 @@
-// Login.tsx
-import { useNavigate } from 'react-router-dom';
-import { FC, useState } from 'react';
+// src/pages/LoginForm.tsx
+import { useNavigate, Link } from 'react-router-dom';
+import { FC, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import userService from '../services/user_service';
+import SocialLoginButtons from '../components/SocialLoginButtons';
+import { useAuth } from '../context/AuthContext';
 
 interface FormData {
   email: string;
   password: string;
 }
 
-const LoginForm: FC<{ onLoginSuccess: () => void }> = ({ onLoginSuccess }) => {
+const LoginForm: FC = () => {
   const navigate = useNavigate();
-
+  const { login, isAuthenticated, loading: authLoading, error: authError } = useAuth();
   const [loading, setLoading] = useState(false);
+
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>();
 
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
-    try {
-      const { request } = userService.login(data.email, data.password); // חילוץ ה-request
-      const response = await request; // מחכה לפתרון ה-Promise
-      console.log('Login response:', response.data);
-      // שמירת הטוקן
-      localStorage.setItem('accessToken', response.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.refreshToken);
-      localStorage.setItem('userId', response.data._id);
-
-      // עדכון מצב
-      onLoginSuccess();
-
-      // ניווט לדף הבית
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
       navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      setLoading(true);
+      await login(data.email, data.password);
+      // Navigation is handled by the useEffect that watches isAuthenticated
     } catch (error) {
-      console.error('Login failed:', error);
-      alert('Wrong email or password');
+      console.error('Login form error:', error);
+      // Auth context already shows error toast
     } finally {
       setLoading(false);
     }
@@ -72,36 +70,52 @@ const LoginForm: FC<{ onLoginSuccess: () => void }> = ({ onLoginSuccess }) => {
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit)}>
+                  {/* Show auth error if present */}
+                  {authError && (
+                    <div className="alert alert-danger" role="alert">
+                      {authError}
+                    </div>
+                  )}
+
                   {/* Email Field */}
                   <div className="mb-4">
                     <label className="form-label">Email</label>
                     <input
                       {...register('email', {
-                        required: true,
-                        pattern: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        required: 'Email is required',
+                        pattern: {
+                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                          message: 'Please enter a valid email address',
+                        },
                       })}
                       type="email"
                       className={`form-control form-control-lg rounded-pill ${errors.email ? 'is-invalid' : ''}`}
                       placeholder="Enter your email"
                     />
-                    {errors.email && <div className="invalid-feedback">Please enter a valid email address</div>}
+                    {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
                   </div>
 
                   {/* Password Field */}
                   <div className="mb-4">
                     <div className="d-flex justify-content-between">
                       <label className="form-label">Password</label>
-                      <a href="/forgot-password" className="text-decoration-none small">
+                      <Link to="/forgot-password" className="text-decoration-none small">
                         Forgot password?
-                      </a>
+                      </Link>
                     </div>
                     <input
-                      {...register('password', { required: true })}
+                      {...register('password', {
+                        required: 'Password is required',
+                        minLength: {
+                          value: 6,
+                          message: 'Password must be at least 6 characters',
+                        },
+                      })}
                       type="password"
                       className={`form-control form-control-lg rounded-pill ${errors.password ? 'is-invalid' : ''}`}
                       placeholder="Enter your password"
                     />
-                    {errors.password && <div className="invalid-feedback">Password is required</div>}
+                    {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
                   </div>
 
                   {/* Login Button */}
@@ -112,8 +126,8 @@ const LoginForm: FC<{ onLoginSuccess: () => void }> = ({ onLoginSuccess }) => {
                       background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)',
                       border: 'none',
                     }}
-                    disabled={loading}>
-                    {loading ? (
+                    disabled={loading || authLoading}>
+                    {loading || authLoading ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                         Signing in...
@@ -124,25 +138,20 @@ const LoginForm: FC<{ onLoginSuccess: () => void }> = ({ onLoginSuccess }) => {
                   </button>
 
                   {/* Social Login Options */}
-                  <div className="text-center mb-4">
-                    <p className="text-muted small mb-4">Or continue with</p>
-                    <div className="d-flex justify-content-center gap-3">
-                      <button type="button" className="btn btn-light rounded-circle p-3">
-                        <span style={{ fontSize: '1.2rem' }}>🌐</span>
-                      </button>
-                      <button type="button" className="btn btn-light rounded-circle p-3">
-                        <span style={{ fontSize: '1.2rem' }}>📱</span>
-                      </button>
+                  <div className="mb-4">
+                    <div className="text-center mb-3">
+                      <p className="text-muted">Or continue with</p>
                     </div>
+                    <SocialLoginButtons />
                   </div>
 
                   {/* Registration Link */}
                   <div className="text-center">
                     <p className="text-muted mb-0">
                       Don't have an account?{' '}
-                      <a href="/register" className="text-decoration-none">
+                      <Link to="/register" className="text-decoration-none">
                         Sign up
-                      </a>
+                      </Link>
                     </p>
                   </div>
                 </form>
