@@ -160,27 +160,6 @@ const LoginForm: FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Navigation Footer */}
-      <footer className="py-3 bg-white border-top mt-auto">
-        <div className="container">
-          <div className="row justify-content-around align-items-center g-3">
-            {[
-              { icon: '🏠', label: 'Home' },
-              { icon: '🔍', label: 'Search' },
-              { icon: '❤️', label: 'Favorites' },
-              { icon: '👤', label: 'Profile' },
-            ].map((item, index) => (
-              <div key={index} className="col-3 text-center">
-                <button className="btn btn-link text-dark p-0 d-flex flex-column align-items-center gap-1 text-decoration-none">
-                  <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
-                  <small className="text-muted">{item.label}</small>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

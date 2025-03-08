@@ -185,6 +185,38 @@ class PostService {
   savePost(postData: Post) {
     return apiClient.post<Post>('/posts', postData).then((res) => res.data);
   }
+
+  getPaginatedPosts(queryParams: string) {
+    return apiClient
+      .get(`/posts/paginated?${queryParams}`)
+      .then((response) => {
+        // Check if we have the expected response structure
+        if (response.data && (response.data.posts || Array.isArray(response.data))) {
+          // Handle both response formats: { posts: [...], pagination: {...} } or just an array
+          if (Array.isArray(response.data)) {
+            // If just an array, create a pagination-style response
+            return {
+              posts: response.data,
+              pagination: {
+                total: response.data.length,
+                page: 1,
+                limit: response.data.length,
+                pages: 1,
+                hasMore: false,
+              },
+            };
+          }
+          return response.data;
+        }
+
+        // If response doesn't have the expected structure
+        throw new Error('Invalid response format from server');
+      })
+      .catch((error) => {
+        console.error('Error fetching paginated posts:', error);
+        throw error;
+      });
+  }
 }
 
 export default new PostService();

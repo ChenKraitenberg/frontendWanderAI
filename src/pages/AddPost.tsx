@@ -83,7 +83,7 @@ const AddPost = () => {
         endDate: formData.endDate.toISOString(),
         price: Number(formData.price),
         maxSeats: Number(formData.maxSeats),
-        bookedSeats: Number(formData.bookedSeats),
+        bookedSeats: 0,
         image: uploadResponse.url,
         userId: userId,
         owner: userId,
