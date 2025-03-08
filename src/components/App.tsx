@@ -20,7 +20,12 @@ import '../styles/visual-enhancements.css';
 
 // Protected route component using the AuthContext
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+
+  // If user has no name set, redirect to profile to prompt them to set one
+  if (isAuthenticated && user && !user.name) {
+    return <Navigate to="/profile" />;
+  }
 
   if (loading) {
     return (
@@ -62,7 +67,9 @@ const AppRoutes = () => {
         path="/"
         element={
           <ProtectedRoute>
-            <Homepage />
+            <>
+              <Homepage />
+            </>
           </ProtectedRoute>
         }
       />
@@ -70,7 +77,9 @@ const AppRoutes = () => {
         path="/profile"
         element={
           <ProtectedRoute>
-            <Profile />
+            <>
+              <Profile />
+            </>
           </ProtectedRoute>
         }
       />
@@ -78,7 +87,9 @@ const AppRoutes = () => {
         path="/generate-trip"
         element={
           <ProtectedRoute>
-            <GenerateTrip />
+            <>
+              <GenerateTrip />
+            </>
           </ProtectedRoute>
         }
       />
@@ -86,7 +97,9 @@ const AppRoutes = () => {
         path="/add-post"
         element={
           <ProtectedRoute>
-            <SharePost />
+            <>
+              <SharePost />
+            </>
           </ProtectedRoute>
         }
       />
@@ -94,7 +107,9 @@ const AppRoutes = () => {
         path="/edit-post/:id"
         element={
           <ProtectedRoute>
-            <EditPostPage />
+            <>
+              <EditPostPage />
+            </>
           </ProtectedRoute>
         }
       />

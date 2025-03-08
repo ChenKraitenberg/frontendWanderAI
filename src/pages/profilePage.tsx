@@ -8,16 +8,18 @@ import MapComponent from '../components/MapComponent';
 import Footer from '../components/shared/Footer';
 import PostCard from '../components/PostCard';
 import LogoutButton from '../components/LogoutButton';
+import ProfileEdit from '../components/ProfileEdit';
 import { Post } from '../types';
 import ProfileImageUploader from '../components/ProfileImageUploader';
+import { getUserDisplayName } from '../utils/userDisplayUtils';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  // Use useCallback to prevent the dependency cycle in useEffect
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true);
@@ -26,8 +28,18 @@ const ProfilePage: React.FC = () => {
       const { request } = userService.getMe();
       const response = await request;
       const userData = response.data;
+
+      // Check if userData has name property from API
+      if (!userData.name) {
+        // Try to get name from localStorage if not in API response
+        const storedName = localStorage.getItem('userName');
+        if (storedName) {
+          userData.name = storedName;
+        }
+      }
+
       setUser(userData);
-      console.log('User data fetched:', userData);
+      console.log('User data fetched with name check:', userData);
 
       return userData;
     } catch (error) {
@@ -38,7 +50,6 @@ const ProfilePage: React.FC = () => {
       setLoading(false);
     }
   }, [navigate]);
-
   // Separate function to fetch posts
   const fetchUserPosts = async (userId: string) => {
     try {
@@ -59,6 +70,17 @@ const ProfilePage: React.FC = () => {
         ...user,
         avatar: newImageUrl,
       });
+    }
+  };
+
+  // Function to handle profile updates
+  const handleProfileUpdate = (updatedUser: { name?: string; avatar?: string }) => {
+    if (user) {
+      setUser({
+        ...user,
+        ...updatedUser,
+      });
+      setIsEditingProfile(false);
     }
   };
 
@@ -150,6 +172,8 @@ const ProfilePage: React.FC = () => {
       </div>
     );
   }
+  console.log('Profile rendering with name:', getUserDisplayName(user));
+  console.log('User object in profile:', user);
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-light">
@@ -183,7 +207,7 @@ const ProfilePage: React.FC = () => {
             </div>
             <div className="col text-white">
               {/* Use name instead of email when available */}
-              <h1 className="display-6 fw-bold mb-2">{user?.name || user?.email}</h1>
+              <h1 className="display-6 fw-bold mb-2">{getUserDisplayName(user)}</h1>
               <div className="d-flex gap-4">
                 <div>
                   <div className="fw-bold h4 mb-0">{posts.length}</div>
@@ -195,7 +219,13 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="col-auto">
+            <div className="col-auto d-flex gap-2">
+              {!isEditingProfile && (
+                <button className="btn btn-light rounded-pill px-4 py-2" onClick={() => setIsEditingProfile(true)}>
+                  <i className="bi bi-pencil me-2"></i>
+                  Edit Profile
+                </button>
+              )}
               <LogoutButton variant="outline" className="px-4 py-2" />
             </div>
           </div>
@@ -204,13 +234,22 @@ const ProfilePage: React.FC = () => {
 
       {/* Main Content */}
       <div className="container flex-grow-1" style={{ marginTop: '-3rem' }}>
-        {/* Map Section */}
-        <div className="card border-0 shadow-lg rounded-4 mb-4">
-          <div className="card-body p-4">
-            <h3 className="h5 mb-4">My Travel Map</h3>
-            {user?._id && <MapComponent userId={user._id} />}
+        {isEditingProfile ? (
+          // Profile Edit Form
+          <div className="mb-4">
+            {user && user._id && (
+              <ProfileEdit user={user as { _id: string; email: string; name?: string; avatar?: string | null }} onUpdate={handleProfileUpdate} onCancel={() => setIsEditingProfile(false)} />
+            )}
           </div>
-        </div>
+        ) : (
+          // Map Section
+          <div className="card border-0 shadow-lg rounded-4 mb-4">
+            <div className="card-body p-4">
+              <h3 className="h5 mb-4">My Travel Map</h3>
+              {user?._id && <MapComponent userId={user._id} />}
+            </div>
+          </div>
+        )}
 
         {/* Trips Section */}
         <div className="card border-0 shadow-lg rounded-4">

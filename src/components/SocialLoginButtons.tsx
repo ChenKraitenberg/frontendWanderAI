@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { SocialLoginCredentials } from '../services/auth_service';
 
-// ======== טיפוסים עבור Google Sign-In ========
+// Types for Google Sign-In
 interface GoogleCredentialResponse {
   credential: string;
 }
@@ -26,7 +26,7 @@ interface GooglePayload {
   picture: string;
 }
 
-// ======== טיפוסים עבור Facebook SDK ========
+// Types for Facebook SDK
 interface FBInitOptions {
   appId: string;
   cookie: boolean;
@@ -57,7 +57,7 @@ interface FBUserInfo {
   };
 }
 
-// ======== הרחבת ממשק החלון הגלובלי ========
+// Extending window interface
 declare global {
   interface Window {
     google?: {
@@ -82,7 +82,21 @@ const SocialLoginButtons: React.FC = () => {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [loadingFacebook, setLoadingFacebook] = useState(false);
 
-  // אתחול Google Sign-In
+  // State for username modal
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  interface SocialData {
+    provider: 'google' | 'facebook';
+    token: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  }
+
+  const [pendingSocialData, setPendingSocialData] = useState<SocialData | null>(null);
+
+  // Initialize Google Sign-In
   useEffect(() => {
     const loadGoogleScript = () => {
       const script = document.createElement('script');
@@ -114,7 +128,7 @@ const SocialLoginButtons: React.FC = () => {
 
     loadGoogleScript();
 
-    // אתחול Facebook SDK
+    // Initialize Facebook SDK
     const loadFacebookScript = () => {
       const script = document.createElement('script');
       script.src = 'https://connect.facebook.net/en_US/sdk.js';
@@ -137,7 +151,7 @@ const SocialLoginButtons: React.FC = () => {
 
     loadFacebookScript();
 
-    // ניקוי סקריפטים בעת unmount
+    // Cleanup scripts on unmount
     return () => {
       const googleScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
       if (googleScript) {
@@ -151,7 +165,7 @@ const SocialLoginButtons: React.FC = () => {
     };
   }, []);
 
-  // טיפול בכניסה עם Google
+  // Handle Google sign-in
   const handleGoogleSignIn = async (response: GoogleCredentialResponse) => {
     try {
       setLoadingGoogle(true);
@@ -161,11 +175,12 @@ const SocialLoginButtons: React.FC = () => {
         throw new Error('Google authentication failed');
       }
 
-      // ניתוח ה-JWT לקבלת פרטי המשתמש
+      // Parse JWT to get user info
       const tokenParts = credential.split('.');
       const payload: GooglePayload = JSON.parse(atob(tokenParts[1]));
 
-      const socialLoginData: SocialLoginCredentials = {
+      // Store social login data to use after username is provided
+      const socialData: SocialData = {
         provider: 'google',
         token: credential,
         email: payload.email,
@@ -173,15 +188,16 @@ const SocialLoginButtons: React.FC = () => {
         avatar: payload.picture,
       };
 
-      await socialLogin(socialLoginData);
+      // Show username modal
+      setPendingSocialData(socialData);
+      setShowUsernameModal(true);
     } catch (error) {
       console.error('Google sign-in error:', error);
-    } finally {
       setLoadingGoogle(false);
     }
   };
 
-  // טיפול בכניסה עם Facebook
+  // Handle Facebook login
   const handleFacebookLogin = () => {
     if (!window.FB) {
       console.error('Facebook SDK not loaded');
@@ -193,10 +209,11 @@ const SocialLoginButtons: React.FC = () => {
     window.FB.login(
       (response: FBLoginResponse) => {
         if (response.authResponse) {
-          // שליפת פרטי המשתמש
+          // Get user info
           window.FB?.api('/me', 'GET', { fields: 'name,email,picture' }, async (userInfo: FBUserInfo) => {
             try {
-              const socialLoginData: SocialLoginCredentials = {
+              // Store social login data to use after username is provided
+              const socialData: SocialData = {
                 provider: 'facebook',
                 token: response.authResponse!.accessToken,
                 email: userInfo.email,
@@ -204,10 +221,11 @@ const SocialLoginButtons: React.FC = () => {
                 avatar: userInfo.picture?.data?.url,
               };
 
-              await socialLogin(socialLoginData);
+              // Show username modal
+              setPendingSocialData(socialData);
+              setShowUsernameModal(true);
             } catch (error) {
               console.error('Facebook login error:', error);
-            } finally {
               setLoadingFacebook(false);
             }
           });
@@ -220,9 +238,55 @@ const SocialLoginButtons: React.FC = () => {
     );
   };
 
+  // Handle username submission
+  const handleUsernameSubmit = async () => {
+    // Validate username
+    if (username.length < 3) {
+      setUsernameError('Username must be at least 3 characters');
+      return;
+    }
+
+    if (username.length > 30) {
+      setUsernameError('Username must be less than 30 characters');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+      setUsernameError('Username can only contain letters, numbers, and ._-');
+      return;
+    }
+
+    try {
+      // Update the social login data with the provided username
+      if (!pendingSocialData) {
+        throw new Error('Pending social data is missing');
+      }
+
+      const socialLoginData: SocialLoginCredentials = {
+        ...pendingSocialData,
+        name: username,
+        provider: pendingSocialData.provider, // Ensure provider is always defined
+      };
+
+      // Complete the social login process
+      await socialLogin(socialLoginData);
+
+      // Reset states
+      setShowUsernameModal(false);
+      setPendingSocialData(null);
+      setUsername('');
+      setUsernameError(null);
+    } catch (error) {
+      console.error('Social login error:', error);
+    } finally {
+      setLoadingGoogle(false);
+      setLoadingFacebook(false);
+    }
+  };
+
   return (
     <div className="d-flex flex-column gap-3">
-      {/* כפתור כניסה עם Google */}
+      {/* Google Sign-In Button */}
       <div id="google-signin-button" className={`google-btn mx-auto ${loadingGoogle ? 'opacity-50' : ''}`} style={{ position: 'relative', minHeight: '40px' }}>
         {loadingGoogle && (
           <div className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75 rounded">
@@ -233,7 +297,7 @@ const SocialLoginButtons: React.FC = () => {
         )}
       </div>
 
-      {/* כפתור כניסה עם Facebook */}
+      {/* Facebook Login Button */}
       <button
         type="button"
         onClick={handleFacebookLogin}
@@ -255,6 +319,70 @@ const SocialLoginButtons: React.FC = () => {
           </>
         )}
       </button>
+
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 shadow-lg border-0">
+              <div className="modal-header border-0">
+                <h5 className="modal-title fw-bold">Choose a Username</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowUsernameModal(false);
+                    setLoadingGoogle(false);
+                    setLoadingFacebook(false);
+                    setPendingSocialData(null);
+                  }}
+                />
+              </div>
+              <div className="modal-body py-4">
+                <p>Please choose a username that will be displayed when you post or comment.</p>
+                <div className="mb-3">
+                  <label className="form-label">Username</label>
+                  <input
+                    type="text"
+                    className={`form-control form-control-lg rounded-pill ${usernameError ? 'is-invalid' : ''}`}
+                    placeholder="Enter username"
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setUsernameError(null);
+                    }}
+                  />
+                  <div className="form-text">Your username must be 3-30 characters long and can contain letters, numbers, and ._-</div>
+                  {usernameError && <div className="invalid-feedback">{usernameError}</div>}
+                </div>
+              </div>
+              <div className="modal-footer border-0">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary rounded-pill px-4"
+                  onClick={() => {
+                    setShowUsernameModal(false);
+                    setLoadingGoogle(false);
+                    setLoadingFacebook(false);
+                    setPendingSocialData(null);
+                  }}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn text-white rounded-pill px-4"
+                  style={{
+                    background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)',
+                    border: 'none',
+                  }}
+                  onClick={handleUsernameSubmit}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
