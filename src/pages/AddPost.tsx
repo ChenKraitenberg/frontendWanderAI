@@ -1,24 +1,37 @@
-// AddPost.tsx
-import React, { useState } from 'react';
+// src/pages/AddPost.tsx
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Footer from '../components/shared/Footer';
 import PostService from '../services/post_service';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const AddPost = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
-    name: '', // Changed from title to name
-    description: '', // Changed from content to description
+    name: '',
+    description: '',
     startDate: new Date(),
     endDate: new Date(),
     price: 0,
     maxSeats: 1,
     bookedSeats: 0,
     image: null as File | null,
+    destination: '',
+    category: 'RELAXED' as 'RELAXED' | 'MODERATE' | 'INTENSIVE',
   });
+
+  // Redirect if user info is not available
+  useEffect(() => {
+    if (!user || !user.name) {
+      toast.error('Please complete your profile with a username before creating posts');
+      navigate('/profile');
+    }
+  }, [user, navigate]);
 
   // Handle image upload
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,10 +46,6 @@ const AddPost = () => {
   };
 
   // Submit the form
-  // תיקון לפונקצית createPost בדף AddPost.tsx
-  // עדיף להחליף את כל הפונקציה handleSubmit
-
-  // מתוך src/pages/AddPost.tsx
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -44,25 +53,29 @@ const AddPost = () => {
     try {
       // Validate required fields
       if (!formData.image) {
-        throw new Error('אנא בחר תמונה');
+        throw new Error('Please select an image');
       }
       if (!formData.name || !formData.description) {
-        throw new Error('אנא מלא את כל השדות הנדרשים');
+        throw new Error('Please fill in all required fields');
       }
 
       // Upload image
       const imageFormData = new FormData();
       imageFormData.append('file', formData.image);
 
-      console.log('מעלה תמונה...');
+      console.log('Uploading image...');
       const uploadResponse = await PostService.uploadImage(imageFormData);
-      console.log('התמונה הועלתה בהצלחה:', uploadResponse);
+      console.log('Image uploaded successfully:', uploadResponse);
 
-      // שמירה על מזהה המשתמש הנוכחי
+      // Get current user ID
       const userId = localStorage.getItem('userId');
       console.log('User ID for new post:', userId);
 
-      // יצירת הפוסט
+      if (!userId) {
+        throw new Error('User ID not found. Please log in again.');
+      }
+
+      // Create post with user info
       const postData = {
         name: formData.name,
         description: formData.description,
@@ -72,23 +85,36 @@ const AddPost = () => {
         maxSeats: Number(formData.maxSeats),
         bookedSeats: Number(formData.bookedSeats),
         image: uploadResponse.url,
-        userId: userId || undefined, // הוספת מזהה המשתמש
-        owner: userId || undefined, // הוספת מזהה המשתמש גם כבעלים
+        userId: userId,
+        owner: userId,
+        destination: formData.destination,
+        category: formData.category,
+        // Add user information to be displayed with the post
+        user: {
+          _id: userId,
+          email: user?.email || '',
+          name: user?.name || '',
+          avatar: user?.avatar || '',
+        },
+        createdAt: new Date(),
+        likes: [],
+        comments: [],
       };
 
-      console.log('יוצר פוסט עם הנתונים:', postData);
+      console.log('Creating post with data:', postData);
       const createdPost = await PostService.createPost(postData);
-      console.log('הפוסט נוצר בהצלחה:', createdPost);
+      console.log('Post created successfully:', createdPost);
 
-      // ניווט בחזרה
+      // Navigate back
+      toast.success('Post created successfully!');
       navigate('/profile');
     } catch (error: unknown) {
       if (error instanceof Error) {
-        console.error('נכשל ביצירת הפוסט:', error.message);
-        alert(error.message);
+        console.error('Failed to create post:', error.message);
+        toast.error(error.message);
       } else {
-        console.error('נכשל ביצירת הפוסט:', error);
-        alert('אירעה שגיאה לא ידועה');
+        console.error('Failed to create post:', error);
+        toast.error('An unknown error occurred');
       }
     } finally {
       setLoading(false);
@@ -154,6 +180,18 @@ const AddPost = () => {
                     />
                   </div>
 
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      className="form-control form-control-lg rounded-pill"
+                      placeholder="Destination (e.g., Paris, France)"
+                      value={formData.destination}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, destination: e.target.value }))}
+                      required
+                    />
+                    <div className="form-text">Specify the location for better discovery</div>
+                  </div>
+
                   <div className="row g-4 mb-4">
                     <div className="col-md-6">
                       <label className="form-label">Start Date</label>
@@ -200,6 +238,17 @@ const AddPost = () => {
                         min="1"
                         required
                       />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label">Trip Type</label>
+                      <select
+                        className="form-select form-select-lg rounded-pill"
+                        value={formData.category}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value as 'RELAXED' | 'MODERATE' | 'INTENSIVE' }))}>
+                        <option value="RELAXED">Relaxed</option>
+                        <option value="MODERATE">Moderate</option>
+                        <option value="INTENSIVE">Intensive</option>
+                      </select>
                     </div>
                   </div>
 

@@ -19,6 +19,7 @@ export interface AuthContextType {
   socialLogin: (credentials: SocialLoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateUserProfile: (userData: Partial<User>) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

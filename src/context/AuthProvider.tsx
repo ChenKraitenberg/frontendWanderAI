@@ -1,8 +1,9 @@
-// src/contexts/AuthProvider.tsx
+// src/context/AuthProvider.tsx
 import React, { ReactNode, useState, useEffect } from 'react';
 import authService, { SocialLoginCredentials } from '../services/auth_service';
 import { toast } from 'react-toastify';
 import AuthContext, { User } from './AuthContext';
+import userService from '../services/user_service';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -14,7 +15,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // בדיקה האם המשתמש מאומת במעמד ההרצה
+  // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -24,9 +25,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (token && userId) {
           setIsAuthenticated(true);
 
-          // אם יש אימות – נסה למשוך את נתוני המשתמש
+          // If authenticated, try to fetch user data
           try {
-            // ניתן לממש קריאה לשרת לקבלת פרטי המשתמש (למשל: userService.getMe())
+            // You could implement userService.getMe() to fetch user details
             setUser({
               _id: userId,
               email: localStorage.getItem('userEmail') || '',
@@ -35,7 +36,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
           } catch (err) {
             console.error('Failed to fetch user data', err);
-            // אם משיכת נתוני המשתמש נכשלה, ננסה לרענן את הטוקן
+            // If fetching user data fails, try to refresh the token
             await refreshAuth();
           }
         }
@@ -51,12 +52,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  // הגדרת רענון אוטומטי של הטוקן
+  // Set up automatic token refresh
   useEffect(() => {
     let refreshTimer: NodeJS.Timeout;
 
     if (isAuthenticated) {
-      // לדוגמה, רענון כל 10 דקות
+      // Refresh every 10 minutes for example
       refreshTimer = setInterval(() => {
         refreshAuth().catch((err) => {
           console.error('Failed to refresh token', err);
@@ -87,7 +88,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatar: response.user?.avatar,
       });
 
-      // שמירת פרטי המשתמש ב-localStorage
+      // Store user info in localStorage
       localStorage.setItem('userEmail', response.user?.email || email);
       if (response.user?.name) localStorage.setItem('userName', response.user.name);
       if (response.user?.avatar) localStorage.setItem('userAvatar', response.user.avatar);
@@ -108,6 +109,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
 
+      // Require name for registration
+      if (!name) {
+        setError('Username is required');
+        toast.error('Registration failed: Username is required');
+        throw new Error('Username is required');
+      }
+
       const response = await authService.register(email, password, name, avatar);
 
       setIsAuthenticated(true);
@@ -118,8 +126,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatar: response.user?.avatar || avatar,
       });
 
+      // Store user info in localStorage
       localStorage.setItem('userEmail', response.user?.email || email);
-      if (name) localStorage.setItem('userName', name);
+      localStorage.setItem('userName', name);
       if (avatar) localStorage.setItem('userAvatar', avatar);
 
       toast.success('Registration successful!');
@@ -138,6 +147,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
 
+      // Make sure we have a name for social login
+      if (!credentials.name) {
+        setError('Username is required');
+        toast.error('Social login failed: Username is required');
+        throw new Error('Username is required');
+      }
+
       const response = await authService.socialLogin(credentials);
 
       setIsAuthenticated(true);
@@ -148,8 +164,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatar: credentials.avatar,
       });
 
+      // Store user info in localStorage
       if (credentials.email) localStorage.setItem('userEmail', credentials.email);
-      if (credentials.name) localStorage.setItem('userName', credentials.name);
+      localStorage.setItem('userName', credentials.name);
       if (credentials.avatar) localStorage.setItem('userAvatar', credentials.avatar);
 
       toast.success(`Logged in with ${credentials.provider.charAt(0).toUpperCase() + credentials.provider.slice(1)}!`);
@@ -171,6 +188,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(false);
       setUser(null);
 
+      // Clear user info from localStorage
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userName');
       localStorage.removeItem('userAvatar');
@@ -191,13 +209,38 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setIsAuthenticated(true);
 
-      // handle the response internally
+      // Handle response internally
     } catch (err) {
       console.error('Token refresh error:', err);
       setIsAuthenticated(false);
       setUser(null);
 
       throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUserProfile = async (userData: Partial<User>) => {
+    try {
+      setLoading(true);
+      const response = await userService.updateProfile(userData);
+
+      // Update local storage
+      if (userData.name) {
+        localStorage.setItem('userName', userData.name);
+      }
+
+      // Update the user state
+      setUser((prev) => {
+        if (!prev) return null;
+        return { ...prev, ...userData };
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -215,6 +258,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         socialLogin,
         logout,
         refreshAuth,
+        updateUserProfile,
       }}>
       {children}
     </AuthContext.Provider>

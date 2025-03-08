@@ -9,7 +9,7 @@ import userService from '../services/user_service';
 interface FormData {
   email: string;
   password: string;
-  name: string;
+  name: string; // This will be the username/nickname
   img?: FileList;
 }
 
@@ -151,20 +151,37 @@ const RegistrationForm: FC = () => {
 
                   {/* Form Fields */}
                   <div className="mb-4">
-                    <label className="form-label">Full Name</label>
+                    <label className="form-label">
+                      Username <span className="text-danger">*</span>
+                    </label>
                     <input
                       {...register('name', {
-                        required: 'Name is required',
+                        required: 'Username is required',
+                        minLength: {
+                          value: 3,
+                          message: 'Username must be at least 3 characters',
+                        },
+                        maxLength: {
+                          value: 30,
+                          message: 'Username must be less than 30 characters',
+                        },
+                        pattern: {
+                          value: /^[a-zA-Z0-9._-]+$/,
+                          message: 'Username can only contain letters, numbers, and ._-',
+                        },
                       })}
                       type="text"
                       className={`form-control form-control-lg rounded-pill ${errors.name ? 'is-invalid' : ''}`}
-                      placeholder="Enter your full name"
+                      placeholder="Choose a username"
                     />
                     {errors.name && <div className="invalid-feedback">{errors.name.message}</div>}
+                    <div className="form-text">This name will be visible to others when you post or comment</div>
                   </div>
 
                   <div className="mb-4">
-                    <label className="form-label">Email</label>
+                    <label className="form-label">
+                      Email <span className="text-danger">*</span>
+                    </label>
                     <input
                       {...register('email', {
                         required: 'Email is required',
@@ -181,7 +198,9 @@ const RegistrationForm: FC = () => {
                   </div>
 
                   <div className="mb-4">
-                    <label className="form-label">Password</label>
+                    <label className="form-label">
+                      Password <span className="text-danger">*</span>
+                    </label>
                     <input
                       {...register('password', {
                         required: 'Password is required',
