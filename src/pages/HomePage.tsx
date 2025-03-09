@@ -358,21 +358,157 @@ const HomePage: React.FC = () => {
               Filter
             </button>
           </div>
-        ) : (
-          <div className="posts-grid">
-            {posts.map((post, index) => (
-              <PostCard
-                key={`post-${post._id}-${index}`}
-                post={post}
-                onLike={handleLike}
-                onCommentClick={() => handleCommentClick(post._id)}
-                onEdit={() => handleEditPost(post._id)}
-                onDelete={() => handleDeletePost(post._id)}
-                showActions={post.userId === userId}
-              />
-            ))}
-          </div>
-        )}
+
+          {/* Expandable Advanced Filters */}
+          {showFilters && (
+            <div className="advanced-filters-panel mt-3">
+              <form onSubmit={handleApplyFilters} className="row g-3">
+                {/* Destination filter */}
+                <div className="col-md-4">
+                  <label className="form-label">Destination</label>
+                  <input type="text" className="form-control" placeholder="Search location" name="destination" value={filters.destination} onChange={handleFilterChange} />
+                </div>
+
+                {/* Price range */}
+                <div className="col-md-4">
+                  <label className="form-label">Price Range</label>
+                  <div className="d-flex gap-2">
+                    <input type="number" className="form-control" placeholder="Min" name="minPrice" value={filters.minPrice} onChange={handleFilterChange} min="0" />
+                    <input type="number" className="form-control" placeholder="Max" name="maxPrice" value={filters.maxPrice} onChange={handleFilterChange} min="0" />
+                  </div>
+                </div>
+
+                {/* Filter action buttons */}
+                <div className="col-md-4 d-flex align-items-end">
+                  <div className="d-flex gap-2 w-100">
+                    <button type="submit" className="btn-apply">
+                      Apply
+                    </button>
+                    <button type="button" className="btn-reset" onClick={resetFilters}>
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Active filter badges */}
+          {(filters.destination || filters.minPrice || filters.maxPrice) && (
+            <div className="active-filters mt-3">
+              <div className="d-flex align-items-center mb-2">
+                <small className="text-muted me-2">Active filters:</small>
+                <button className="clear-filters-btn" onClick={resetFilters}>
+                  Clear all
+                </button>
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {filters.destination && (
+                  <span className="filter-badge">
+                    {filters.destination}
+                    <button className="btn-close-filter" onClick={() => setFilters((prev) => ({ ...prev, destination: '' }))} aria-label="Remove destination filter">
+                      ×
+                    </button>
+                  </span>
+                )}
+
+                {(filters.minPrice || filters.maxPrice) && (
+                  <span className="filter-badge">
+                    Price: ${filters.minPrice || '0'} - ${filters.maxPrice || 'any'}
+                    <button className="btn-close-filter" onClick={() => setFilters((prev) => ({ ...prev, minPrice: '', maxPrice: '' }))} aria-label="Remove price filter">
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Feed Content Area */}
+        <div className="feed-container">
+          {loading && posts.length === 0 ? (
+            <div className="loading-container">
+              <div className="spinner">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              <p>Loading amazing adventures...</p>
+            </div>
+          ) : error ? (
+            <div className="error-container">
+              <div className="error-icon">⚠️</div>
+              <h3>Oops! Something went wrong</h3>
+              <p>{error}</p>
+              <button
+                className="btn-retry"
+                onClick={() => {
+                  setPage(1);
+                  fetchPosts(1, true);
+                }}>
+                Try Again
+              </button>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="empty-container">
+              <div className="empty-icon">🔍</div>
+              <h3>No adventures found</h3>
+              <p>
+                {filters.destination || filters.minPrice || filters.maxPrice || filters.category
+                  ? 'No posts match your current filters. Try adjusting your filters or create your own adventure!'
+                  : 'Be the first to share your amazing travel experiences!'}
+              </p>
+              <button className="btn-create" onClick={() => navigate('/add-post')}>
+                Create Post
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Instagram-style vertical feed */}
+              <div className="posts-feed">
+                {posts.map((post, index) => {
+                  // If this is the last post in the array and we have more posts to load,
+                  // attach the ref for intersection observer
+                  const isLastPost = index === posts.length - 1 && hasMore;
+
+                  return (
+                    <div key={`post-container-${post._id}-${index}`} className="feed-item" ref={isLastPost ? lastPostElementRef : null}>
+                      <PostCard
+                        key={`post-${post._id}-${index}`}
+                        post={post}
+                        onLike={handleLike}
+                        onCommentClick={() => handleCommentClick(post._id)}
+                        onEdit={() => handleEditPost(post._id)}
+                        onDelete={() => handleDeletePost(post._id)}
+                        showActions={post.userId === userId}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Loading indicator when fetching more posts */}
+                {pageLoading && (
+                  <div className="loading-more">
+                    <div className="spinner-border spinner-border-sm" role="status">
+                      <span className="visually-hidden">Loading more...</span>
+                    </div>
+                    <p>Loading more adventures...</p>
+                  </div>
+                )}
+
+                {/* End of posts indicator */}
+                {!hasMore && posts.length > 0 && !pageLoading && (
+                  <div className="end-of-feed">
+                    <div className="end-line"></div>
+                    <p>You've reached the end!</p>
+                    <div className="end-line"></div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </MainLayout>
   );
