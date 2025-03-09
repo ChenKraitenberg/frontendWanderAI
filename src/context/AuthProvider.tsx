@@ -9,6 +9,10 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const isErrorWithResponse = (error: unknown): error is { response: { data: { message?: string } } } => {
+  return typeof error === 'object' && error !== null && 'response' in error;
+};
+
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
@@ -27,20 +31,20 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           // If authenticated, try to fetch user data
           try {
-            // You could implement userService.getMe() to fetch user details
+            // אפשר להחליף זאת בקריאה ל-userService.getMe()
             setUser({
               _id: userId,
               email: localStorage.getItem('userEmail') || '',
               name: localStorage.getItem('userName') || '',
               avatar: localStorage.getItem('userAvatar') || '',
             });
-          } catch (err) {
+          } catch (err: unknown) {
             console.error('Failed to fetch user data', err);
-            // If fetching user data fails, try to refresh the token
+            // במקרה של כישלון, מנסים לרענן את הטוקן
             await refreshAuth();
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Authentication check failed', err);
         setIsAuthenticated(false);
         setUser(null);
@@ -52,14 +56,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  // Set up automatic token refresh
+  // Set up automatic token refresh every 10 דקות
   useEffect(() => {
     let refreshTimer: NodeJS.Timeout;
 
     if (isAuthenticated) {
-      // Refresh every 10 minutes for example
       refreshTimer = setInterval(() => {
-        refreshAuth().catch((err) => {
+        refreshAuth().catch((err: unknown) => {
           console.error('Failed to refresh token', err);
           logout();
         });
@@ -94,7 +97,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.user?.avatar) localStorage.setItem('userAvatar', response.user.avatar);
 
       toast.success('Login successful!');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
       setError('Invalid email or password');
       toast.error('Login failed: Invalid email or password');
@@ -109,7 +112,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
 
-      // Require name for registration
+      // יש לוודא שקיים שם למשתמש
       if (!name) {
         setError('Username is required');
         toast.error('Registration failed: Username is required');
@@ -132,7 +135,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (avatar) localStorage.setItem('userAvatar', avatar);
 
       toast.success('Registration successful!');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Registration error:', err);
       setError('Registration failed. Please try again.');
       toast.error('Registration failed. Please check your information and try again.');
@@ -147,33 +150,47 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
 
-      // Make sure we have a name for social login
-      if (!credentials.name) {
-        setError('Username is required');
-        toast.error('Social login failed: Username is required');
-        throw new Error('Username is required');
+      // Debug log
+      console.log(`AuthProvider: Processing social login for ${credentials.provider}, email: ${credentials.email}`);
+
+      // יש לוודא שקיים אימייל
+      if (!credentials.email) {
+        setError('Email is required for social login');
+        throw new Error('Email is required for social login');
       }
 
       const response = await authService.socialLogin(credentials);
 
       setIsAuthenticated(true);
-      setUser({
+
+      // בניית האובייקט המשתמש
+      const user: User = {
         _id: response._id,
-        email: credentials.email || '',
-        name: credentials.name,
-        avatar: credentials.avatar,
-      });
+        email: response.user?.email || credentials.email || '',
+        name: response.user?.name || credentials.name || '',
+        avatar: response.user?.avatar || credentials.avatar || '',
+      };
+
+      setUser(user);
 
       // Store user info in localStorage
-      if (credentials.email) localStorage.setItem('userEmail', credentials.email);
-      localStorage.setItem('userName', credentials.name);
-      if (credentials.avatar) localStorage.setItem('userAvatar', credentials.avatar);
+      localStorage.setItem('userEmail', user.email);
+      if (user.name) localStorage.setItem('userName', user.name);
+      if (user.avatar) localStorage.setItem('userAvatar', user.avatar);
 
-      toast.success(`Logged in with ${credentials.provider.charAt(0).toUpperCase() + credentials.provider.slice(1)}!`);
-    } catch (err) {
+      toast.success(`Logged in with ${credentials.provider}!`);
+      console.log(`AuthProvider: Social login successful for user ID: ${response._id}`);
+
+      //return response;
+    } catch (err: unknown) {
       console.error('Social login error:', err);
-      setError(`Failed to login with ${credentials.provider}`);
-      toast.error(`Failed to login with ${credentials.provider}. Please try again.`);
+      if (isErrorWithResponse(err) && err.response.data?.message) {
+        setError(`Social login failed: ${err.response.data.message}`);
+        toast.error(`Login failed: ${err.response.data.message}`);
+      } else {
+        setError(`Failed to login with ${credentials.provider}`);
+        toast.error(`Failed to login with ${credentials.provider}. Please try again.`);
+      }
       throw err;
     } finally {
       setLoading(false);
@@ -188,13 +205,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(false);
       setUser(null);
 
-      // Clear user info from localStorage
+      // נקה את הפרטים ב-localStorage
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userName');
       localStorage.removeItem('userAvatar');
 
       toast.success('Logged out successfully');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Logout error:', err);
       toast.error('Logout failed. Please try again.');
     } finally {
@@ -205,16 +222,34 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshAuth = async (): Promise<void> => {
     try {
       setLoading(true);
-      await authService.refreshToken();
+      const response = await authService.refreshToken();
 
       setIsAuthenticated(true);
 
-      // Handle response internally
-    } catch (err) {
+      // עדכון נתוני המשתמש במידה וקיימים
+      if (response.user) {
+        setUser((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            ...response.user,
+            _id: response._id || prev._id,
+            email: response.user?.email || prev.email,
+          };
+        });
+
+        // עדכון localStorage
+        if (response.user.email) localStorage.setItem('userEmail', response.user.email);
+        if (response.user.name) localStorage.setItem('userName', response.user.name);
+        if (response.user.avatar) localStorage.setItem('userAvatar', response.user.avatar);
+      }
+
+      toast.success('Token refreshed successfully');
+    } catch (err: unknown) {
       console.error('Token refresh error:', err);
       setIsAuthenticated(false);
       setUser(null);
-
+      toast.error('Failed to refresh token. Please log in again.');
       throw err;
     } finally {
       setLoading(false);
@@ -226,21 +261,21 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const response = await userService.updateProfile(userData);
 
-      // Update local storage
+      // עדכון localStorage במידה וקיים שם חדש
       if (userData.name) {
         localStorage.setItem('userName', userData.name);
       }
 
-      // Update the user state
+      // עדכון מצב המשתמש
       setUser((prev) => {
         if (!prev) return null;
         return { ...prev, ...userData };
       });
 
       return response;
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-      throw error;
+    } catch (err: unknown) {
+      console.error('Failed to update profile:', err);
+      throw err;
     } finally {
       setLoading(false);
     }

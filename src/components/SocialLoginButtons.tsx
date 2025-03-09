@@ -2,6 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { SocialLoginCredentials } from '../services/auth_service';
+import { toast } from 'react-toastify';
+
+// Helper function for error type guard
+const isErrorWithResponse = (error: unknown): error is { response: { data: { message?: string } } } => {
+  return typeof error === 'object' && error !== null && 'response' in error;
+};
 
 // Types for Google Sign-In
 interface GoogleCredentialResponse {
@@ -26,37 +32,6 @@ interface GooglePayload {
   picture: string;
 }
 
-// Types for Facebook SDK
-interface FBInitOptions {
-  appId: string;
-  cookie: boolean;
-  xfbml: boolean;
-  version: string;
-}
-
-interface FBLoginOptions {
-  scope: string;
-}
-
-interface FBAuthResponse {
-  accessToken: string;
-}
-
-interface FBLoginResponse {
-  authResponse: FBAuthResponse | null;
-  status: string;
-}
-
-interface FBUserInfo {
-  name: string;
-  email: string;
-  picture?: {
-    data?: {
-      url?: string;
-    };
-  };
-}
-
 // Extending window interface
 declare global {
   interface Window {
@@ -69,25 +44,20 @@ declare global {
         };
       };
     };
-    FB?: {
-      init: (options: FBInitOptions) => void;
-      login: (callback: (response: FBLoginResponse) => void, options: FBLoginOptions) => void;
-      api: (path: string, method: string, params: Record<string, unknown>, callback: (response: FBUserInfo) => void) => void;
-    };
   }
 }
 
 const SocialLoginButtons: React.FC = () => {
   const { socialLogin } = useAuth();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [loadingFacebook, setLoadingFacebook] = useState(false);
 
   // State for username modal
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [username, setUsername] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
+
   interface SocialData {
-    provider: 'google' | 'facebook';
+    provider: 'google';
     token: string;
     email: string;
     name: string;
@@ -100,12 +70,14 @@ const SocialLoginButtons: React.FC = () => {
   useEffect(() => {
     const loadGoogleScript = () => {
       const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
+      script.src = 'https://accounts.google.com/gsi/client?hl=en'; // Force English
       script.async = true;
       script.defer = true;
       script.onload = initializeGoogleSignIn;
       document.body.appendChild(script);
     };
+
+    const isRegistrationPage = window.location.pathname.includes('register');
 
     const initializeGoogleSignIn = () => {
       if (window.google) {
@@ -120,47 +92,18 @@ const SocialLoginButtons: React.FC = () => {
             theme: 'outline',
             size: 'large',
             width: 250,
-            text: 'continue_with',
+            text: isRegistrationPage ? 'signup_with' : 'signin_with', // Use sign up on registration page
           });
         }
       }
     };
-
     loadGoogleScript();
-
-    // Initialize Facebook SDK
-    const loadFacebookScript = () => {
-      const script = document.createElement('script');
-      script.src = 'https://connect.facebook.net/en_US/sdk.js';
-      script.async = true;
-      script.defer = true;
-      script.onload = initializeFacebookSDK;
-      document.body.appendChild(script);
-    };
-
-    const initializeFacebookSDK = () => {
-      if (window.FB) {
-        window.FB.init({
-          appId: import.meta.env.VITE_FACEBOOK_APP_ID,
-          cookie: true,
-          xfbml: true,
-          version: 'v16.0',
-        });
-      }
-    };
-
-    loadFacebookScript();
 
     // Cleanup scripts on unmount
     return () => {
       const googleScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
       if (googleScript) {
         document.body.removeChild(googleScript);
-      }
-
-      const facebookScript = document.querySelector('script[src="https://connect.facebook.net/en_US/sdk.js"]');
-      if (facebookScript) {
-        document.body.removeChild(facebookScript);
       }
     };
   }, []);
@@ -179,6 +122,9 @@ const SocialLoginButtons: React.FC = () => {
       const tokenParts = credential.split('.');
       const payload: GooglePayload = JSON.parse(atob(tokenParts[1]));
 
+      // Log email for debugging purposes
+      console.log(`Google login with email: ${payload.email}`);
+
       // Store social login data to use after username is provided
       const socialData: SocialData = {
         provider: 'google',
@@ -188,54 +134,33 @@ const SocialLoginButtons: React.FC = () => {
         avatar: payload.picture,
       };
 
-      // Show username modal
-      setPendingSocialData(socialData);
-      setShowUsernameModal(true);
-    } catch (error) {
+      // Skip username prompt if email already exists in the system
+      try {
+        // Complete the social login process immediately
+        await socialLogin(socialData);
+        toast.success('Logged in with Google!');
+        // Reset states
+        setPendingSocialData(null);
+        setUsername('');
+        setUsernameError(null);
+      } catch (error: unknown) {
+        if (isErrorWithResponse(error) && error.response.data?.message === 'Username is required') {
+          setPendingSocialData(socialData);
+          setShowUsernameModal(true);
+        } else if (isErrorWithResponse(error)) {
+          console.error('Google sign-in error:', error);
+          toast.error('Login failed: ' + (error.response.data?.message || 'An error occurred'));
+        } else {
+          console.error('Google sign-in error:', error);
+          toast.error('Login failed: An error occurred');
+        }
+      }
+    } catch (error: unknown) {
       console.error('Google sign-in error:', error);
+      toast.error('Google sign-in failed');
+    } finally {
       setLoadingGoogle(false);
     }
-  };
-
-  // Handle Facebook login
-  const handleFacebookLogin = () => {
-    if (!window.FB) {
-      console.error('Facebook SDK not loaded');
-      return;
-    }
-
-    setLoadingFacebook(true);
-
-    window.FB.login(
-      (response: FBLoginResponse) => {
-        if (response.authResponse) {
-          // Get user info
-          window.FB?.api('/me', 'GET', { fields: 'name,email,picture' }, async (userInfo: FBUserInfo) => {
-            try {
-              // Store social login data to use after username is provided
-              const socialData: SocialData = {
-                provider: 'facebook',
-                token: response.authResponse!.accessToken,
-                email: userInfo.email,
-                name: userInfo.name,
-                avatar: userInfo.picture?.data?.url,
-              };
-
-              // Show username modal
-              setPendingSocialData(socialData);
-              setShowUsernameModal(true);
-            } catch (error) {
-              console.error('Facebook login error:', error);
-              setLoadingFacebook(false);
-            }
-          });
-        } else {
-          console.error('User cancelled login or did not fully authorize.');
-          setLoadingFacebook(false);
-        }
-      },
-      { scope: 'email,public_profile' }
-    );
   };
 
   // Handle username submission
@@ -270,17 +195,22 @@ const SocialLoginButtons: React.FC = () => {
 
       // Complete the social login process
       await socialLogin(socialLoginData);
+      toast.success(`Logged in with ${pendingSocialData.provider.charAt(0).toUpperCase() + pendingSocialData.provider.slice(1)}!`);
 
       // Reset states
       setShowUsernameModal(false);
       setPendingSocialData(null);
       setUsername('');
       setUsernameError(null);
-    } catch (error) {
-      console.error('Social login error:', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Social login error:', error.message);
+      } else {
+        console.error('Social login error:', error);
+      }
+      toast.error('Login failed, please try again');
     } finally {
       setLoadingGoogle(false);
-      setLoadingFacebook(false);
     }
   };
 
@@ -297,29 +227,6 @@ const SocialLoginButtons: React.FC = () => {
         )}
       </div>
 
-      {/* Facebook Login Button */}
-      <button
-        type="button"
-        onClick={handleFacebookLogin}
-        disabled={loadingFacebook}
-        className="btn rounded-pill mx-auto px-4 py-2"
-        style={{
-          backgroundColor: '#1877F2',
-          color: 'white',
-          border: 'none',
-          position: 'relative',
-          minWidth: '250px',
-        }}>
-        {loadingFacebook ? (
-          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        ) : (
-          <>
-            <i className="bi bi-facebook me-2"></i>
-            Continue with Facebook
-          </>
-        )}
-      </button>
-
       {/* Username Modal */}
       {showUsernameModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -333,7 +240,6 @@ const SocialLoginButtons: React.FC = () => {
                   onClick={() => {
                     setShowUsernameModal(false);
                     setLoadingGoogle(false);
-                    setLoadingFacebook(false);
                     setPendingSocialData(null);
                   }}
                 />
@@ -363,7 +269,6 @@ const SocialLoginButtons: React.FC = () => {
                   onClick={() => {
                     setShowUsernameModal(false);
                     setLoadingGoogle(false);
-                    setLoadingFacebook(false);
                     setPendingSocialData(null);
                   }}>
                   Cancel

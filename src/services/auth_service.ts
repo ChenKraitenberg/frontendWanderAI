@@ -1,8 +1,9 @@
 // src/services/auth_service.ts
 import apiClient from './api-client';
+import axios from 'axios';
 
 export interface SocialLoginCredentials {
-  provider: 'google' | 'facebook';
+  provider: 'google';
   token: string;
   email?: string;
   name?: string;
@@ -18,6 +19,11 @@ export interface AuthResponse {
     name?: string;
     avatar?: string;
   };
+}
+
+export interface CheckUserResponse {
+  exists: boolean;
+  userId?: string;
 }
 
 class AuthService {
@@ -66,9 +72,43 @@ class AuthService {
     }
   }
 
+  // Check if a user with given email exists
+  async checkIfUserExists(email: string): Promise<CheckUserResponse> {
+    try {
+      // Check if the endpoint exists, if not, consider a fallback approach
+      const response = await apiClient.post<CheckUserResponse>('/auth/check-user', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Error checking if user exists:', error);
+
+      // FALLBACK: If the endpoint doesn't exist, we can try to check if the
+      // user exists by trying to log in with a dummy password and checking
+      // for a specific error message
+      try {
+        // Try to get user info by email directly if that endpoint exists
+        await apiClient.get(`/auth/user-by-email/${email}`);
+        // If we get here, the user exists
+        return { exists: true };
+      } catch (innerError: unknown) {
+        // Check the error response
+        if (axios.isAxiosError(innerError) && innerError.response?.status === 404) {
+          // 404 means user not found
+          return { exists: false };
+        } else if (axios.isAxiosError(innerError) && (innerError.response?.status === 400 || innerError.response?.status === 401)) {
+          // 400 or 401 likely means the user exists but credentials are wrong
+          return { exists: true };
+        }
+        // For any other error, assume user doesn't exist
+        return { exists: false };
+      }
+    }
+  }
+
   // External/Social login with Google or Facebook
   async socialLogin(credentials: SocialLoginCredentials): Promise<AuthResponse> {
     try {
+      console.log(`Attempting social login with ${credentials.provider} for email: ${credentials.email}`);
+
       const response = await apiClient.post('/auth/social-login', credentials);
 
       // Store tokens and user info
@@ -76,6 +116,18 @@ class AuthService {
       localStorage.setItem('refreshToken', response.data.refreshToken);
       localStorage.setItem('userId', response.data._id);
 
+      // Also store additional user info if available
+      if (response.data.user?.email) {
+        localStorage.setItem('userEmail', response.data.user.email);
+      }
+      if (response.data.user?.name) {
+        localStorage.setItem('userName', response.data.user.name);
+      }
+      if (response.data.user?.avatar) {
+        localStorage.setItem('userAvatar', response.data.user.avatar);
+      }
+
+      console.log(`Social login successful for ${credentials.email}, user ID: ${response.data._id}`);
       return response.data;
     } catch (error) {
       console.error('Social login failed:', error);

@@ -28,9 +28,12 @@ interface UpdatePostData {
 
 class PostService {
   // Get all posts
-  getPosts = async () => {
+  getPosts = async (queryParams?: string) => {
+    const url = queryParams ? `/posts?${queryParams}` : '/posts';
+    console.log('Fetching posts with URL:', url);
+
     try {
-      const response = await apiClient.get('/posts');
+      const response = await apiClient.get(url);
       console.log('Fetched posts:', response.data);
       return response.data;
     } catch (error) {
@@ -40,15 +43,51 @@ class PostService {
   };
 
   // Get a single post by ID
-  getPostById = async (id: string) => {
+  getByUserId = async (userId: string) => {
+    console.log('Service: Fetching posts for user ID:', userId);
+
+    // Try the user-specific endpoint first
     try {
-      console.log(`Fetching post ${id}`);
-      const response = await apiClient.get(`/posts/${id}`);
-      console.log(`Fetched post ${id}:`, response.data);
-      return response.data;
+      const response = await apiClient.get<Post[]>(`/posts/user/${userId}`);
+      console.log(`Fetched ${response.data.length} posts for user ${userId} via /posts/user/:id endpoint`);
+      if (response.data.length > 0) {
+        return response.data;
+      }
     } catch (error) {
-      console.error(`Error fetching post ${id}:`, error);
-      throw error;
+      console.log('Error with user endpoint, trying alternative methods:', error);
+    }
+
+    // If that fails or returns empty, try with query params
+    try {
+      // Try by owner
+      const ownerResponse = await apiClient.get<Post[]>(`/posts?owner=${userId}`);
+      if (ownerResponse.data.length > 0) {
+        console.log(`Fetched ${ownerResponse.data.length} posts for user ${userId} via owner query`);
+        return ownerResponse.data;
+      }
+
+      // Try by userId
+      const userIdResponse = await apiClient.get<Post[]>(`/posts?userId=${userId}`);
+      if (userIdResponse.data.length > 0) {
+        console.log(`Fetched ${userIdResponse.data.length} posts for user ${userId} via userId query`);
+        return userIdResponse.data;
+      }
+
+      // If still no posts, try filtering all posts
+      const allPosts = await this.getPosts();
+      const userPosts = allPosts.filter((post: Post) => post.userId === userId || post.user?._id === userId);
+
+      if (userPosts.length > 0) {
+        console.log(`Found ${userPosts.length} posts for user ${userId} via client-side filtering`);
+        return userPosts;
+      }
+
+      // If we get here, there are no posts for this user
+      console.log(`No posts found for user ${userId} via any method`);
+      return [];
+    } catch (error) {
+      console.error('Error fetching posts by user ID:', error);
+      return [];
     }
   };
 
@@ -66,6 +105,18 @@ class PostService {
         throw error;
       });
   }
+
+  // Get a single post by ID
+  getPostById = async (id: string) => {
+    try {
+      const response = await apiClient.get<Post>(`/posts/${id}`);
+      console.log(`Fetched post with ID ${id}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching post with ID ${id}:`, error);
+      throw error;
+    }
+  };
 
   // Update an existing post - using delete and recreate approach
   // since the server doesn't have a direct update endpoint
@@ -96,9 +147,6 @@ class PostService {
       };
 
       // Remove properties that shouldn't be sent to the server
-      delete mergedData._id;
-      delete mergedData.updatedAt;
-
       // Create the new post
       const newPost = await this.createPost(mergedData as CreatePostData);
       console.log('Post updated successfully (recreated):', newPost);
@@ -135,16 +183,16 @@ class PostService {
       console.error('Post ID is required');
       throw new Error('Post ID is required');
     }
-  
+
     try {
       const userId = localStorage.getItem('userId');
       console.log(`Toggling like for post ${id} (user: ${userId})`);
-      
+
       const response = await apiClient.post(`/posts/${id}/like`);
-      
+
       // Log success
       console.log(`Like API response for post ${id}:`, response);
-      
+
       // Ensure the response contains the expected data
       if (!response.data) {
         console.warn('Empty response from server');
@@ -158,14 +206,14 @@ class PostService {
         console.log(`Like toggled successfully (array response) for post ${id}:`, response.data);
         return {
           _id: id,
-          likes: response.data
+          likes: response.data,
         };
       } else {
         console.warn('Unexpected response format:', response.data);
         return {
           _id: id,
           likes: [],
-          ...response.data
+          ...response.data,
         };
       }
     } catch (error) {
@@ -173,7 +221,6 @@ class PostService {
       throw error;
     }
   };
-
 
   // Add a comment
   addComment(id: string, text: string) {
@@ -214,10 +261,6 @@ class PostService {
         console.error('Error uploading image:', error);
         throw error;
       });
-  }
-
-  getByUserId(userId: string) {
-    return apiClient.get<Post[]>(`/posts?owner=${userId}`).then((res) => res.data);
   }
 
   savePost(postData: Post) {
