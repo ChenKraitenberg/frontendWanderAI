@@ -18,12 +18,12 @@ const EditPostPage: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Post>>({
     title: '',
     description: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: new Date(),
+    endDate: new Date(),
     price: 0,
-    maxSeats: 1,
+    //maxSeats: 1,
     destination: '',
-    category: 'RELAXED',
+    category: 'RELAXED' as 'RELAXED' | 'MODERATE' | 'INTENSIVE',
   });
 
   useEffect(() => {
@@ -107,6 +107,8 @@ const EditPostPage: React.FC = () => {
       const updatedPostData = {
         ...formData,
         image: updatedImageUrl,
+        startDate: (formData.startDate as string) || '',
+        endDate: (formData.endDate as string) || '',
       };
 
       await postService.updatePost(id, updatedPostData);

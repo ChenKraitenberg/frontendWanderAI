@@ -1,8 +1,10 @@
 // services/ai_service.ts
+import axios from 'axios';
 import { PostPreferences, GeneratedPost } from '../types';
 
 const token = import.meta.env.VITE_HF_API_TOKEN;
 const MODEL_URL = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1';
+
 console.log('Token loaded:', !!import.meta.env.VITE_HF_API_TOKEN);
 console.log('Token first 5 chars:', import.meta.env.VITE_HF_API_TOKEN?.substring(0, 5));
 console.log('Hugging Face API Token:', token);
@@ -36,7 +38,8 @@ Evening:
 Be specific with locations, restaurant names, and activities.`;
 };
 
-const parseGeneratedText = (text: string): GeneratedPost => {
+
+const parseGeneratedText = (text: string, preferences: PostPreferences): GeneratedPost => {
   const lines = text
     .split('\n')
     .map((line) => line.trim())
@@ -84,21 +87,17 @@ const parseGeneratedText = (text: string): GeneratedPost => {
     description: description || 'A personalized travel itinerary.',
     itinerary: days,
     imageUrl: '/api/placeholder/800/400',
-    destination: 'Unknown',
-    duration: '7 days',
-    category: 'MODERATE',
+    destination: preferences.destination,
+    duration: preferences.duration,
+    category: preferences.category,
   };
 };
 
 const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost> => {
   try {
-    const response = await fetch(MODEL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    const response = await axios.post(
+      MODEL_URL,
+      {
         inputs: createPrompt(preferences),
         parameters: {
           max_length: 1000,
@@ -106,16 +105,18 @@ const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost
           top_p: 0.95,
           return_full_text: false,
         },
-      }),
-    });
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-    if (!response.ok) {
-      throw new Error(`API call failed with status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = response.data;
     const generatedText = Array.isArray(data) ? data[0].generated_text : data.generated_text;
-    return parseGeneratedText(generatedText);
+    return parseGeneratedText(generatedText, preferences);
   } catch (error) {
     console.error('Error in generateTrip:', error);
     throw error;
