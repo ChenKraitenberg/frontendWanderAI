@@ -1,4 +1,4 @@
-// // services/ai_service.ts
+// services/ai_service.ts
 import axios from 'axios';
 import { PostPreferences, GeneratedPost } from '../types';
 
@@ -37,6 +37,7 @@ Evening:
 
 Be specific with locations, restaurant names, and activities.`;
 };
+
 
 const parseGeneratedText = (text: string, preferences: PostPreferences): GeneratedPost => {
   const lines = text

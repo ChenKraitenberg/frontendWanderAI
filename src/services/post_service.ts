@@ -28,26 +28,29 @@ interface UpdatePostData {
 
 class PostService {
   // Get all posts
-  getPosts() {
-    return apiClient
-      .get('/posts')
-      .then((response) => response.data)
-      .catch((error) => {
-        console.error('Error fetching posts:', error);
-        throw error;
-      });
-  }
+  getPosts = async () => {
+    try {
+      const response = await apiClient.get('/posts');
+      console.log('Fetched posts:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      throw error;
+    }
+  };
 
   // Get a single post by ID
-  getPostById(id: string) {
-    return apiClient
-      .get(`/posts/${id}`)
-      .then((response) => response.data)
-      .catch((error) => {
-        console.error(`Error fetching post ${id}:`, error);
-        throw error;
-      });
-  }
+  getPostById = async (id: string) => {
+    try {
+      console.log(`Fetching post ${id}`);
+      const response = await apiClient.get(`/posts/${id}`);
+      console.log(`Fetched post ${id}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching post ${id}:`, error);
+      throw error;
+    }
+  };
 
   // Create a new post with more flexible typing
   createPost(postData: CreatePostData) {
@@ -127,15 +130,50 @@ class PostService {
   }
 
   // Like a post
-  likePost(id: string) {
-    return apiClient
-      .post(`/posts/${id}/like`)
-      .then((response) => response.data)
-      .catch((error) => {
-        console.error(`Error liking post ${id}:`, error);
-        throw error;
-      });
-  }
+  likePost = async (id: string) => {
+    if (!id) {
+      console.error('Post ID is required');
+      throw new Error('Post ID is required');
+    }
+  
+    try {
+      const userId = localStorage.getItem('userId');
+      console.log(`Toggling like for post ${id} (user: ${userId})`);
+      
+      const response = await apiClient.post(`/posts/${id}/like`);
+      
+      // Log success
+      console.log(`Like API response for post ${id}:`, response);
+      
+      // Ensure the response contains the expected data
+      if (!response.data) {
+        console.warn('Empty response from server');
+        throw new Error('Invalid server response');
+      }
+
+      if (response.data.likes) {
+        console.log(`Like toggled successfully for post ${id}:`, response.data);
+        return response.data;
+      } else if (Array.isArray(response.data)) {
+        console.log(`Like toggled successfully (array response) for post ${id}:`, response.data);
+        return {
+          _id: id,
+          likes: response.data
+        };
+      } else {
+        console.warn('Unexpected response format:', response.data);
+        return {
+          _id: id,
+          likes: [],
+          ...response.data
+        };
+      }
+    } catch (error) {
+      console.error(`Error toggling like for post ${id}:`, error);
+      throw error;
+    }
+  };
+
 
   // Add a comment
   addComment(id: string, text: string) {

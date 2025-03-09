@@ -230,21 +230,46 @@ const HomePage: React.FC = () => {
     setActiveCategory(category);
   };
 
-  const handleLike = async (postId: string) => {
+  const handleLike = async (postId: string, newLikes: string[]) => {
+    if (!postId) {
+      console.error('Invalid post ID for like operation');
+      return;
+    }
+  
     try {
-      await postService.likePost(postId);
-      // Update the specific post
-      const updatedPost = await postService.getPostById(postId);
-
-      // Update in posts
-      setPosts((currentPosts) => currentPosts.map((post) => (post._id === postId ? updatedPost : post)));
-
-      toast.success('Post liked!');
-    } catch (err) {
-      console.error('Error liking post:', err);
-      toast.error('Could not like post. Please try again.');
+      console.log(`HomePage: Handling like for post ${postId}, new likes:`, newLikes);
+      
+      // Update local state immediately for responsive UI
+      setPosts((currentPosts) => {
+        console.log(`HomePage: Updating posts state for like on ${postId}`);
+        return currentPosts.map((post) => {
+          if (post._id === postId) {
+            console.log(`HomePage: Updating post ${postId} with new likes:`, newLikes);
+            return { ...post, likes: newLikes };
+          }
+          return post;
+        });
+      });
+      
+      // No need to call the API again - LikeButton already did that
+      // But we can refresh the data after a delay to ensure consistency
+      setTimeout(async () => {
+        try {
+          console.log(`HomePage: Refreshing posts data to ensure like state is consistent`);
+          const freshPosts = await postService.getPosts();
+          console.log(`HomePage: Got fresh posts data:`, freshPosts);
+          setPosts(freshPosts);
+        } catch (err) {
+          console.error('Error refreshing posts data:', err);
+        }
+      }, 2000); // 2 second delay
+      
+    } catch (error) {
+      console.error('Error handling post like in HomePage:', error);
+      toast.error('Something went wrong with the like operation');
     }
   };
+
 
   const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
@@ -333,156 +358,21 @@ const HomePage: React.FC = () => {
               Filter
             </button>
           </div>
-
-          {/* Expandable Advanced Filters */}
-          {showFilters && (
-            <div className="advanced-filters-panel mt-3">
-              <form onSubmit={handleApplyFilters} className="row g-3">
-                {/* Destination filter */}
-                <div className="col-md-4">
-                  <label className="form-label">Destination</label>
-                  <input type="text" className="form-control" placeholder="Search location" name="destination" value={filters.destination} onChange={handleFilterChange} />
-                </div>
-
-                {/* Price range */}
-                <div className="col-md-4">
-                  <label className="form-label">Price Range</label>
-                  <div className="d-flex gap-2">
-                    <input type="number" className="form-control" placeholder="Min" name="minPrice" value={filters.minPrice} onChange={handleFilterChange} min="0" />
-                    <input type="number" className="form-control" placeholder="Max" name="maxPrice" value={filters.maxPrice} onChange={handleFilterChange} min="0" />
-                  </div>
-                </div>
-
-                {/* Filter action buttons */}
-                <div className="col-md-4 d-flex align-items-end">
-                  <div className="d-flex gap-2 w-100">
-                    <button type="submit" className="btn-apply">
-                      Apply
-                    </button>
-                    <button type="button" className="btn-reset" onClick={resetFilters}>
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Active filter badges */}
-          {(filters.destination || filters.minPrice || filters.maxPrice) && (
-            <div className="active-filters mt-3">
-              <div className="d-flex align-items-center mb-2">
-                <small className="text-muted me-2">Active filters:</small>
-                <button className="clear-filters-btn" onClick={resetFilters}>
-                  Clear all
-                </button>
-              </div>
-              <div className="d-flex flex-wrap gap-2">
-                {filters.destination && (
-                  <span className="filter-badge">
-                    {filters.destination}
-                    <button className="btn-close-filter" onClick={() => setFilters((prev) => ({ ...prev, destination: '' }))} aria-label="Remove destination filter">
-                      ×
-                    </button>
-                  </span>
-                )}
-
-                {(filters.minPrice || filters.maxPrice) && (
-                  <span className="filter-badge">
-                    Price: ${filters.minPrice || '0'} - ${filters.maxPrice || 'any'}
-                    <button className="btn-close-filter" onClick={() => setFilters((prev) => ({ ...prev, minPrice: '', maxPrice: '' }))} aria-label="Remove price filter">
-                      ×
-                    </button>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Feed Content Area */}
-        <div className="feed-container">
-          {loading && posts.length === 0 ? (
-            <div className="loading-container">
-              <div className="spinner">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-              </div>
-              <p>Loading amazing adventures...</p>
-            </div>
-          ) : error ? (
-            <div className="error-container">
-              <div className="error-icon">⚠️</div>
-              <h3>Oops! Something went wrong</h3>
-              <p>{error}</p>
-              <button
-                className="btn-retry"
-                onClick={() => {
-                  setPage(1);
-                  fetchPosts(1, true);
-                }}>
-                Try Again
-              </button>
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="empty-container">
-              <div className="empty-icon">🔍</div>
-              <h3>No adventures found</h3>
-              <p>
-                {filters.destination || filters.minPrice || filters.maxPrice || filters.category
-                  ? 'No posts match your current filters. Try adjusting your filters or create your own adventure!'
-                  : 'Be the first to share your amazing travel experiences!'}
-              </p>
-              <button className="btn-create" onClick={() => navigate('/add-post')}>
-                Create Post
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Instagram-style vertical feed */}
-              <div className="posts-feed">
-                {posts.map((post, index) => {
-                  // If this is the last post in the array and we have more posts to load,
-                  // attach the ref for intersection observer
-                  const isLastPost = index === posts.length - 1 && hasMore;
-
-                  return (
-                    <div key={post._id} className="feed-item" ref={isLastPost ? lastPostElementRef : null}>
-                      <PostCard
-                        post={post}
-                        onLike={() => handleLike(post._id)}
-                        onCommentClick={() => handleCommentClick(post._id)}
-                        onEdit={() => handleEditPost(post._id)}
-                        onDelete={() => handleDeletePost(post._id)}
-                        showActions={post.userId === userId}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Loading indicator when fetching more posts */}
-                {pageLoading && (
-                  <div className="loading-more">
-                    <div className="spinner-border spinner-border-sm" role="status">
-                      <span className="visually-hidden">Loading more...</span>
-                    </div>
-                    <p>Loading more adventures...</p>
-                  </div>
-                )}
-
-                {/* End of posts indicator */}
-                {!hasMore && posts.length > 0 && !pageLoading && (
-                  <div className="end-of-feed">
-                    <div className="end-line"></div>
-                    <p>You've reached the end!</p>
-                    <div className="end-line"></div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        ) : (
+          <div className="posts-grid">
+            {posts.map((post, index) => (
+              <PostCard
+                key={`post-${post._id}-${index}`}
+                post={post}
+                onLike={handleLike}
+                onCommentClick={() => handleCommentClick(post._id)}
+                onEdit={() => handleEditPost(post._id)}
+                onDelete={() => handleDeletePost(post._id)}
+                showActions={post.userId === userId}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </MainLayout>
   );

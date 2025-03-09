@@ -135,23 +135,26 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleLikePost = async (postId: string) => {
-    if (!postId) {
-      console.error('Invalid post ID for like operation');
-      return;
-    }
-
+  const handleLikePost = async (postId: string, newLikes: string[]) => {
     try {
-      await postService.likePost(postId);
-
-      // Update the specific post instead of reloading all posts
-      const updatedPost = await postService.getPostById(postId);
-      setPosts((prevPosts) => prevPosts.map((post) => (post._id === postId ? updatedPost : post)));
-
-      toast.success('Post liked!');
+      // Update local state immediately for responsive UI
+      setPosts((currentPosts) => 
+        currentPosts.map((post) => 
+          post._id === postId 
+            ? { ...post, likes: newLikes } 
+            : post
+        )
+      );
+      
+      // Optionally: If you want to make sure everything is in sync with the server
+      // you can fetch the complete list of user posts again
+      if (user?._id) {
+        const refreshedPosts = await postService.getByUserId(user._id);
+        setPosts(refreshedPosts);
+      }
     } catch (error) {
-      console.error('Error liking post:', error);
-      toast.error('Error liking post');
+      console.error('Error handling post like:', error);
+      toast.error('Something went wrong with the like operation');
     }
   };
 
@@ -275,7 +278,7 @@ const ProfilePage: React.FC = () => {
                     <PostCard
                       key={`post-${post._id}`}
                       post={post}
-                      onLike={() => post._id && handleLikePost(post._id)}
+                      onLike={handleLikePost}
                       onCommentClick={() => post._id && handleCommentClick(post._id)}
                       onEdit={() => post._id && handleEditPost(post._id)}
                       onDelete={() => post._id && handleDeletePost(post._id)}
