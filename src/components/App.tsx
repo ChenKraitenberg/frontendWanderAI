@@ -13,6 +13,7 @@ import SharePost from '../pages/AddPost';
 import EditPostPage from '../pages/EditPostPage';
 import { useAuth } from '../context/AuthContext';
 import AuthProvider from '../context/AuthProvider';
+import PostDetailPage from '../pages/PostDetailPage';
 import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -114,6 +115,14 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+        path="/post/:id"
+        element={
+          <ProtectedRoute>
+            <PostDetailPage />
+          </ProtectedRoute>
+        }
+      />
       {/* Fallback Route */}
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>

@@ -22,8 +22,18 @@ const LikeButton: React.FC<LikeButtonProps> = ({ postId, initialLikes, onLikeUpd
   const isLiked = userId ? likes.includes(userId) : false;
 
   useEffect(() => {
+    console.log(`LikeButton mounted/updated for post ${postId}`);
+    console.log(`Current userId: ${userId}`);
+    console.log(`Initial likes:`, initialLikes);
+    console.log(`Is post liked by current user: ${isLiked}`);
+  }, [postId, initialLikes, userId, isLiked]);
+
+
+  // Update likes when initialLikes change
+  useEffect(() => {
+    console.log(`initialLikes changed for post ${postId}:`, initialLikes);
     setLikes(initialLikes || []);
-  }, [initialLikes]);
+  }, [initialLikes, postId]);
 
 
   const handleLikeClick = async () => {
@@ -43,46 +53,50 @@ const LikeButton: React.FC<LikeButtonProps> = ({ postId, initialLikes, onLikeUpd
         setTimeout(() => setIsAnimating(false), 500);
       }
 
-       // Optimistic UI update - update local state immediately before API call
-       const optimisticLikes = isLiked
-       ? likes.filter(id => id !== userId) 
-       : [...likes, userId];
-     
+        // Create optimistic update (clone the array to avoid mutation)
+      const optimisticLikes = [...likes];
+      
+      if (isLiked) {
+        // Remove like (filter out userId)
+        const index = optimisticLikes.indexOf(userId);
+        if (index > -1) {
+          optimisticLikes.splice(index, 1);
+        }
+      } else {
+        // Add like
+        optimisticLikes.push(userId);
+      }
+      
+      console.log(`Optimistic update - new likes:`, optimisticLikes);
+      
+      // First update local state for responsive UI
       setLikes(optimisticLikes);
-      // עדכון הקומפוננטת האב
+      // Update parent component
       onLikeUpdated(optimisticLikes);
 
-      // Call API to update like status
+      // Call API to update like status on server
       console.log(`Calling likePost API for post ${postId}`);
       const response = await postService.likePost(postId);
       console.log(`API response for likePost:`, response);
-
-      if (response) {
-        // אם יש מערך likes בתגובה
-        if (Array.isArray(response.likes)) {
-          console.log(`Updating likes from server response:`, response.likes);
-          setLikes(response.likes);
-          onLikeUpdated(response.likes);
-        } 
-        // Handle different response formats
-        else if (Array.isArray(response)) {
-          console.log(`Updating likes from array response:`, response);
-          setLikes(response);
-          onLikeUpdated(response);
-        }
-        // If response is not what we expect, keep optimistic update
-        else {
-          console.warn(`Unexpected response format:`, response);
-        }
+      
+      // Handle the server response
+      if (response && response.likes) {
+        console.log(`Server returned updated likes:`, response.likes);
+        
+        // Make sure the server response is used
+        setLikes(response.likes);
+        onLikeUpdated(response.likes);
+      } else {
+        console.warn("Unexpected server response format:", response);
       }
     } catch (error) {
-      console.error('Failed to toggle like', error);
+      console.error('Failed to toggle like:', error);
       
       // Revert to initial state on error
       setLikes(initialLikes);
       onLikeUpdated(initialLikes);
       
-      toast.error('Could not update like. Please try again');
+      toast.error('Could not update like. Please try again.');
     } finally {
       setIsLiking(false);
     }

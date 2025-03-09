@@ -316,6 +316,8 @@ const HomePage: React.FC = () => {
     navigate(`/edit-post/${postId}`);
   };
 
+  
+
   return (
     <MainLayout>
       <style>{styles}</style>
