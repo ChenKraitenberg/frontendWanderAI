@@ -50,15 +50,85 @@ const ProfilePage: React.FC = () => {
       setLoading(false);
     }
   }, [navigate]);
-  // Separate function to fetch posts
+
   const fetchUserPosts = async (userId: string) => {
     try {
       console.log(`Fetching posts for user ID: ${userId}`);
-      const userPosts = await postService.getByUserId(userId);
-      console.log('Posts fetched:', userPosts);
-      setPosts(userPosts);
+
+      // Try the direct user ID endpoint first
+      try {
+        const userPosts = await postService.getByUserId(userId);
+        console.log('Posts fetched by user ID:', userPosts);
+
+        if (userPosts && userPosts.length > 0) {
+          setPosts(userPosts);
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching posts by user ID:', error);
+      }
+
+      console.log('No posts found by user ID, trying alternative methods...');
+
+      // Try owner field
+      try {
+        const ownerQueryParams = new URLSearchParams();
+        ownerQueryParams.append('owner', userId);
+
+        console.log('Fetching posts by owner param:', userId);
+        const ownerResponse = await postService.getPosts(ownerQueryParams.toString());
+
+        if (ownerResponse && ownerResponse.length > 0) {
+          console.log('Posts fetched via owner param:', ownerResponse);
+          setPosts(ownerResponse);
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching posts by owner:', error);
+      }
+
+      // Try userId field as query param
+      try {
+        const userIdQueryParams = new URLSearchParams();
+        userIdQueryParams.append('userId', userId);
+
+        console.log('Fetching posts by userId param:', userId);
+        const userIdResponse = await postService.getPosts(userIdQueryParams.toString());
+
+        if (userIdResponse && userIdResponse.length > 0) {
+          console.log('Posts fetched via userId param:', userIdResponse);
+          setPosts(userIdResponse);
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching posts by userId param:', error);
+      }
+
+      // If user has an email, try looking up posts by email
+      if (user?.email) {
+        try {
+          console.log('Fetching all posts to filter by email...');
+          const allPosts = await postService.getPosts();
+
+          // Filter posts that might be associated with this user's email
+          const userEmailLC = user.email.toLowerCase();
+          const matchingPosts: Post[] = allPosts.filter((post: Post) => post.user?.email?.toLowerCase() === userEmailLC || post.userId === userId || post.userId === userId);
+
+          if (matchingPosts.length > 0) {
+            console.log('Posts matched by email filtering:', matchingPosts);
+            setPosts(matchingPosts);
+            return;
+          }
+        } catch (error) {
+          console.error('Error during email filtering:', error);
+        }
+      }
+
+      // If we still have no posts, set an empty array
+      console.log('No posts found for user through any method');
+      setPosts([]);
     } catch (error) {
-      console.error('Failed to load trips:', error);
+      console.error('Failed to fetch user posts:', error);
       setPosts([]);
     }
   };
@@ -138,14 +208,8 @@ const ProfilePage: React.FC = () => {
   const handleLikePost = async (postId: string, newLikes: string[]) => {
     try {
       // Update local state immediately for responsive UI
-      setPosts((currentPosts) => 
-        currentPosts.map((post) => 
-          post._id === postId 
-            ? { ...post, likes: newLikes } 
-            : post
-        )
-      );
-      
+      setPosts((currentPosts) => currentPosts.map((post) => (post._id === postId ? { ...post, likes: newLikes } : post)));
+
       // Optionally: If you want to make sure everything is in sync with the server
       // you can fetch the complete list of user posts again
       if (user?._id) {
