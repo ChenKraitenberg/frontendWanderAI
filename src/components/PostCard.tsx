@@ -1,10 +1,11 @@
 // src/components/PostCard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../utils/imageUtils';
 import { PostComment } from '../types';
 import LikeButton from './LikeButton';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
+import postService from '../services/post_service';
 
 interface Post {
   _id: string;
@@ -32,7 +33,7 @@ interface Post {
 
 interface PostCardProps {
   post: Post;
-  onLike: () => void;
+  onLike?: (postId: string, newLikes: string[]) => void;
   onCommentClick: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
@@ -45,6 +46,34 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   const isOwner = userId === post.userId;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [postLikes, setPostLikes] = useState<string[]>(post.likes || []);
+  const [currentPost, setCurrentPost] = useState<Post>(post);
+
+// Fetch fresh post data on mount to ensure likes are up to date
+useEffect(() => {
+  const refreshPostData = async () => {
+    try {
+      if (post && post._id) {
+        const updatedPost = await postService.getPostById(post._id);
+        if (updatedPost) {
+          setCurrentPost(updatedPost);
+          setPostLikes(updatedPost.likes || []);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh post data:', error);
+    }
+  };
+
+  refreshPostData();
+}, [post._id]);
+
+// Update local state when post prop changes
+useEffect(() => {
+  setCurrentPost(post);
+  setPostLikes(post.likes || []);
+}, [post]);
+
 
   // Format the date
   const formatDate = (date: Date | string) => {
@@ -84,8 +113,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   };
 
   const handleLikeUpdate = (newLikes: string[]) => {
-    console.log('Likes updated:', newLikes);
-    onLike();
+    setPostLikes(newLikes);
+    // Also update parent component if callback provided
+    if (onLike && post._id) {
+      onLike(post._id, newLikes);
+    }
   };
 
   return (
@@ -96,24 +128,30 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
           className="card-img-top"
           style={{
             height: '180px',
-            backgroundImage: post.image ? `url(${getImageUrl(post.image)})` : 'url(/api/placeholder/800/400)',
+            backgroundImage: currentPost.image ? `url(${getImageUrl(currentPost.image)})` : 'url(/api/placeholder/800/400)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderTopLeftRadius: '1rem',
             borderTopRightRadius: '1rem',
             cursor: 'pointer',
           }}
-          onClick={() => navigate(`/post/${post._id}`)}
+          onClick={() => navigate(`/post/${currentPost._id}`)}
         />
 
         {/* User Info Header */}
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img src={post.user?.avatar ? getImageUrl(post.user.avatar) : '/api/placeholder/45/45'} alt={post.user?.name || 'User'} className="rounded-circle" width="45" height="45" />
+            <img 
+              src={currentPost.user?.avatar ? getImageUrl(currentPost.user.avatar) : '/api/placeholder/45/45'} 
+              alt={currentPost.user?.name || 'User'} 
+              className="rounded-circle" 
+              width="45" 
+              height="45" 
+            />
           </div>
           <div>
-            <h6 className="mb-0 fw-bold">{post.user?.name || post.user?.email || 'Anonymous'}</h6>
-            <small className="text-muted">{formatDate(post.createdAt)}</small>
+            <h6 className="mb-0 fw-bold">{currentPost.user?.name || currentPost.user?.email || 'Anonymous'}</h6>
+            <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
           </div>
 
           {/* Direct action buttons instead of dropdown */}
@@ -131,8 +169,12 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
         {/* Post Content */}
         <div className="card-body">
-          <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post._id}`)}>
-            {post.title}
+          <h5 
+            className="card-title fw-bold mb-2" 
+            style={{ cursor: 'pointer' }} 
+            onClick={() => navigate(`/post/${currentPost._id}`)}
+          >
+            {currentPost.title}
           </h5>
           <p
             className="card-text text-muted mb-3"
@@ -144,48 +186,48 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
               lineHeight: '1.5em',
               maxHeight: '4.5em',
             }}>
-            {truncateText(post.description, 120)}
+            {truncateText(currentPost.description, 120)}
           </p>
 
           {/* Trip Details */}
-          {(post.startDate || post.price) && (
+          {(currentPost.startDate || currentPost.price) && (
             <div className="d-flex flex-wrap gap-3 mb-3">
-              {post.startDate && (
+              {currentPost.startDate && (
                 <div className="small text-muted">
                   <i className="bi bi-calendar me-1"></i>
-                  {formatDate(post.startDate)}
+                  {formatDate(currentPost.startDate)}
                 </div>
               )}
-              {post.price !== undefined && (
+              {currentPost.price !== undefined && (
                 <div className="small text-muted">
-                  <i className="bi bi-cash me-1"></i>${post.price}
+                  <i className="bi bi-cash me-1"></i>${currentPost.price}
                 </div>
               )}
-              {post.maxSeats && (
+              {currentPost.maxSeats && (
                 <div className="small text-muted">
                   <i className="bi bi-people me-1"></i>
-                  {post.maxSeats} seats
+                  {currentPost.maxSeats} seats
                 </div>
               )}
             </div>
           )}
 
           {/* Category Badge */}
-          {post.category && (
+          {currentPost.category && (
             <div className="mb-3">
               <span
                 className="badge rounded-pill px-3 py-2"
                 style={{
                   background:
-                    post.category === 'RELAXED'
+                    currentPost.category === 'RELAXED'
                       ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)'
-                      : post.category === 'MODERATE'
+                      : currentPost.category === 'MODERATE'
                       ? 'linear-gradient(135deg, #FF9966 0%, #FF5E62 100%)'
                       : 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                   color: 'white',
                   fontSize: '0.75rem',
                 }}>
-                {post.category}
+                {currentPost.category}
               </span>
             </div>
           )}
@@ -193,11 +235,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
         {/* Interactions Footer */}
         <div className="card-footer bg-white border-top-0 d-flex justify-content-between">
-          <LikeButton postId={post._id} initialLikes={post.likes} onLikeUpdated={handleLikeUpdate} />
+          <LikeButton 
+            postId={currentPost._id} 
+            initialLikes={postLikes} 
+            onLikeUpdated={handleLikeUpdate} 
+          />
 
-          <button className="btn btn-sm rounded-pill" onClick={onCommentClick} style={{ border: '1px solid #dee2e6' }}>
+          <button 
+            className="btn btn-sm rounded-pill" 
+            onClick={onCommentClick} 
+            style={{ border: '1px solid #dee2e6' }}
+          >
             <span className="me-2">💬</span>
-            <span>{post.comments.length} Comments</span>
+            <span>{currentPost.comments.length} Comments</span>
           </button>
         </div>
       </div>

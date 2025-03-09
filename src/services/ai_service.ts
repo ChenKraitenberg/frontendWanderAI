@@ -1,5 +1,5 @@
 // services/ai_service.ts
-import { TripPreferences, GeneratedTrip } from '../types';
+import { PostPreferences, GeneratedPost } from '../types';
 
 const token = import.meta.env.VITE_HF_API_TOKEN;
 const MODEL_URL = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1';
@@ -7,7 +7,7 @@ console.log('Token loaded:', !!import.meta.env.VITE_HF_API_TOKEN);
 console.log('Token first 5 chars:', import.meta.env.VITE_HF_API_TOKEN?.substring(0, 5));
 console.log('Hugging Face API Token:', token);
 
-const createPrompt = (preferences: TripPreferences): string => {
+const createPrompt = (preferences: PostPreferences): string => {
   return `Create a detailed ${preferences.duration}-day itinerary for ${preferences.destination}.
 Travel style: ${preferences.category}
 Budget level: ${preferences.duration}
@@ -36,7 +36,7 @@ Evening:
 Be specific with locations, restaurant names, and activities.`;
 };
 
-const parseGeneratedText = (text: string): GeneratedTrip => {
+const parseGeneratedText = (text: string): GeneratedPost => {
   const lines = text
     .split('\n')
     .map((line) => line.trim())
@@ -83,11 +83,14 @@ const parseGeneratedText = (text: string): GeneratedTrip => {
     title: title || 'Your Custom Trip',
     description: description || 'A personalized travel itinerary.',
     itinerary: days,
-    image: '/api/placeholder/800/400',
+    imageUrl: '/api/placeholder/800/400',
+    destination: 'Unknown',
+    duration: '7 days',
+    category: 'MODERATE',
   };
 };
 
-const generateTrip = async (preferences: TripPreferences): Promise<GeneratedTrip> => {
+const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost> => {
   try {
     const response = await fetch(MODEL_URL, {
       method: 'POST',

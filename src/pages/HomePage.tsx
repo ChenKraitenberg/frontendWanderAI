@@ -26,6 +26,7 @@ const HomePage: React.FC = () => {
     user?: {
       _id: string;
       email: string;
+      name?: string;
       avatar?: string;
     };
     likes: string[];
@@ -57,18 +58,46 @@ const HomePage: React.FC = () => {
     fetchPosts();
   }, []);
 
-  const handleLike = async (postId: string) => {
+  const handleLike = async (postId: string, newLikes: string[]) => {
+    if (!postId) {
+      console.error('Invalid post ID for like operation');
+      return;
+    }
+  
     try {
-      await postService.likePost(postId);
-      // Refresh posts to update like count
-      const updatedPosts = await postService.getPosts();
-      setPosts(updatedPosts);
-      toast.success('Post liked!');
-    } catch (err) {
-      console.error('Error liking post:', err);
-      toast.error('Could not like post. Please try again.');
+      console.log(`HomePage: Handling like for post ${postId}, new likes:`, newLikes);
+      
+      // Update local state immediately for responsive UI
+      setPosts((currentPosts) => {
+        console.log(`HomePage: Updating posts state for like on ${postId}`);
+        return currentPosts.map((post) => {
+          if (post._id === postId) {
+            console.log(`HomePage: Updating post ${postId} with new likes:`, newLikes);
+            return { ...post, likes: newLikes };
+          }
+          return post;
+        });
+      });
+      
+      // No need to call the API again - LikeButton already did that
+      // But we can refresh the data after a delay to ensure consistency
+      setTimeout(async () => {
+        try {
+          console.log(`HomePage: Refreshing posts data to ensure like state is consistent`);
+          const freshPosts = await postService.getPosts();
+          console.log(`HomePage: Got fresh posts data:`, freshPosts);
+          setPosts(freshPosts);
+        } catch (err) {
+          console.error('Error refreshing posts data:', err);
+        }
+      }, 2000); // 2 second delay
+      
+    } catch (error) {
+      console.error('Error handling post like in HomePage:', error);
+      toast.error('Something went wrong with the like operation');
     }
   };
+
 
   const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
@@ -152,15 +181,14 @@ const HomePage: React.FC = () => {
           </div>
         ) : (
           <div className="posts-grid">
-            {posts.map((post) => (
+            {posts.map((post, index) => (
               <PostCard
-                key={post._id}
+                key={`post-${post._id}-${index}`}
                 post={post}
-                onLike={() => handleLike(post._id)}
+                onLike={handleLike}
                 onCommentClick={() => handleCommentClick(post._id)}
                 onEdit={() => handleEditPost(post._id)}
                 onDelete={() => handleDeletePost(post._id)}
-                // רק הבעלים של הפוסט רואים את כפתורי העריכה והמחיקה
                 showActions={post.userId === userId}
               />
             ))}

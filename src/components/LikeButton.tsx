@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHeart as solidHeart } from '@fortawesome/free-solid-svg-icons';
 import { faHeart as regularHeart } from '@fortawesome/free-regular-svg-icons';
-import tripService from '../services/post_service';
+import postService from '../services/post_service';
+import { toast } from 'react-toastify';
 
 interface LikeButtonProps {
   postId: string;
@@ -16,16 +17,22 @@ const LikeButton: React.FC<LikeButtonProps> = ({ postId, initialLikes, onLikeUpd
   const [isLiking, setIsLiking] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
+   // Get current user ID from localStorage
   const userId = localStorage.getItem('userId');
   const isLiked = userId ? likes.includes(userId) : false;
 
   useEffect(() => {
-    // Update likes if initialLikes changes
     setLikes(initialLikes || []);
   }, [initialLikes]);
 
+
   const handleLikeClick = async () => {
-    if (isLiking || !userId) return;
+    if (isLiking || !userId){
+      if (!userId) {
+        toast.info('Please log in to like posts');
+    }
+      return;
+    }
 
     try {
       setIsLiking(true);
@@ -36,45 +43,82 @@ const LikeButton: React.FC<LikeButtonProps> = ({ postId, initialLikes, onLikeUpd
         setTimeout(() => setIsAnimating(false), 500);
       }
 
-      const response = await tripService.likePost(postId);
+       // Optimistic UI update - update local state immediately before API call
+       const optimisticLikes = isLiked
+       ? likes.filter(id => id !== userId) 
+       : [...likes, userId];
+     
+      setLikes(optimisticLikes);
+      // עדכון הקומפוננטת האב
+      onLikeUpdated(optimisticLikes);
 
-      // Handle different response structures safely
-      let updatedLikes: string[] = [];
+      // Call API to update like status
+      console.log(`Calling likePost API for post ${postId}`);
+      const response = await postService.likePost(postId);
+      console.log(`API response for likePost:`, response);
 
-      if (response && response.likes) {
-        // Direct response structure (from doLike method)
-        updatedLikes = response.likes;
-      } else if (response && Array.isArray(response.likes)) {
-        // Ensure response.likes is an array
-        updatedLikes = response.likes;
-      } else {
-        // Fallback to current likes if response doesn't contain likes
-        console.warn('Like response did not contain expected likes array:', response);
-        updatedLikes = [...likes];
-
-        // If toggle logic is happening server-side, simulate it client-side as fallback
-        if (isLiked) {
-          updatedLikes = updatedLikes.filter((id) => id !== userId);
-        } else if (userId) {
-          updatedLikes.push(userId);
+      if (response) {
+        // אם יש מערך likes בתגובה
+        if (Array.isArray(response.likes)) {
+          console.log(`Updating likes from server response:`, response.likes);
+          setLikes(response.likes);
+          onLikeUpdated(response.likes);
+        } 
+        // Handle different response formats
+        else if (Array.isArray(response)) {
+          console.log(`Updating likes from array response:`, response);
+          setLikes(response);
+          onLikeUpdated(response);
+        }
+        // If response is not what we expect, keep optimistic update
+        else {
+          console.warn(`Unexpected response format:`, response);
         }
       }
-
-      setLikes(updatedLikes);
-      onLikeUpdated(updatedLikes);
     } catch (error) {
-      console.error('Failed to toggle like:', error);
-      // Optionally implement optimistic UI updates here
+      console.error('Failed to toggle like', error);
+      
+      // Revert to initial state on error
+      setLikes(initialLikes);
+      onLikeUpdated(initialLikes);
+      
+      toast.error('Could not update like. Please try again');
     } finally {
       setIsLiking(false);
     }
   };
+
+
+      /*// Update with actual server response
+      if (response && Array.isArray(response.likes)) {
+        setLikes(response.likes);
+        onLikeUpdated(response.likes);
+      } else if (response && typeof response.likes !== 'undefined'){
+        // Handle different response formats
+        setLikes(response.likes || optimisticLikes);
+        onLikeUpdated(response.likes || optimisticLikes);
+      }else{
+        // If response is not what we expect, keep optimistic update
+        onLikeUpdated(optimisticLikes);
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      
+      // Revert to initial state on error
+      setLikes(initialLikes);
+      toast.error('Could not update like. Please try again.');
+    } finally {
+      setIsLiking(false);
+    }
+  };*/
 
   return (
     <button
       className="btn rounded-pill d-flex align-items-center gap-2"
       onClick={handleLikeClick}
       disabled={isLiking}
+      aria-label={isLiked ? "Unlike post" : "Like post"}
+      aria-pressed={isLiked}
       style={{
         border: 'none',
         background: isLiked ? 'rgba(220, 53, 69, 0.1)' : 'rgba(0, 0, 0, 0.05)',
@@ -98,7 +142,7 @@ const LikeButton: React.FC<LikeButtonProps> = ({ postId, initialLikes, onLikeUpd
         }}
       />
       <span>
-        {likes.length} {likes.length === 1 ? 'Like' : 'Likes'}
+        {isLiking ? '...' : `${likes.length} ${likes.length === 1 ? 'Like' : 'Likes'}`}
       </span>
 
       <style>{`
