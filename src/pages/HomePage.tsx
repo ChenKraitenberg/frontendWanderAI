@@ -235,10 +235,10 @@ const HomePage: React.FC = () => {
       console.error('Invalid post ID for like operation');
       return;
     }
-  
+
     try {
       console.log(`HomePage: Handling like for post ${postId}, new likes:`, newLikes);
-      
+
       // Update local state immediately for responsive UI
       setPosts((currentPosts) => {
         console.log(`HomePage: Updating posts state for like on ${postId}`);
@@ -250,7 +250,7 @@ const HomePage: React.FC = () => {
           return post;
         });
       });
-      
+
       // No need to call the API again - LikeButton already did that
       // But we can refresh the data after a delay to ensure consistency
       setTimeout(async () => {
@@ -263,13 +263,11 @@ const HomePage: React.FC = () => {
           console.error('Error refreshing posts data:', err);
         }
       }, 2000); // 2 second delay
-      
     } catch (error) {
       console.error('Error handling post like in HomePage:', error);
       toast.error('Something went wrong with the like operation');
     }
   };
-
 
   const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
@@ -358,7 +356,7 @@ const HomePage: React.FC = () => {
               Filter
             </button>
           </div>
-        ) : (
+          ) : (
           <div className="posts-grid">
             {posts.map((post, index) => (
               <PostCard
@@ -372,7 +370,7 @@ const HomePage: React.FC = () => {
               />
             ))}
           </div>
-        )}
+        </div>
       </div>
     </MainLayout>
   );
