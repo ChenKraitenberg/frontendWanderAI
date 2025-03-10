@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import userService, { User } from '../services/user_service';
 import postService from '../services/post_service';
+import wishlistService, { WishlistItem } from '../services/wishlist_service';
 import MapComponent from '../components/MapComponent';
 import Footer from '../components/shared/Footer';
 import PostCard from '../components/PostCard';
@@ -12,13 +13,16 @@ import ProfileEdit from '../components/ProfileEdit';
 import { Post } from '../types';
 import ProfileImageUploader from '../components/ProfileImageUploader';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
+import WishlistCard from '../components/WishlistCard';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [activeTab, setActiveTab] = useState<'trips' | 'wishlist'>('trips');
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -133,6 +137,19 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+
+  const fetchWishlistItems = () => {
+    try {
+      console.log('Fetching wishlist items from localStorage');
+      const items = wishlistService.getWishlistItems();
+      console.log('Wishlist items fetched:', items);
+      setWishlistItems(items);
+    } catch (error) {
+      console.error('Failed to fetch wishlist items:', error);
+      setWishlistItems([]);
+    }
+  };
+
   // Function to update profile image in local state
   const handleProfileImageUpdate = (newImageUrl: string) => {
     if (user) {
@@ -160,6 +177,8 @@ const ProfilePage: React.FC = () => {
       const userData = await fetchUserData();
       if (userData?._id) {
         await fetchUserPosts(userData._id);
+  
+        fetchWishlistItems();
       }
     };
 
@@ -203,6 +222,10 @@ const ProfilePage: React.FC = () => {
       console.error('Error details when deleting post:', error);
       toast.error('Error deleting post');
     }
+  };
+
+  const handleRemoveFromWishlist = (itemId: string) => {
+    setWishlistItems((current) => current.filter(item => item.id !== itemId));
   };
 
   const handleLikePost = async (postId: string, newLikes: string[]) => {
@@ -318,52 +341,132 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
 
-        {/* Trips Section */}
-        <div className="card border-0 shadow-lg rounded-4">
-          <div className="card-body p-4">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h3 className="h5 mb-0">My Trips</h3>
-              <button
-                className="btn btn-outline-primary rounded-pill px-3"
-                onClick={() => navigate('/generate-trip')}
+        {/* Tabs for Trips/Wishlist */}
+        <div className="mb-4">
+          <ul className="nav nav-pills nav-fill">
+            <li className="nav-item">
+              <button 
+                className={`nav-link ${activeTab === 'trips' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('trips')}
                 style={{
-                  borderColor: '#4158D0',
-                  color: '#4158D0',
+                  background: activeTab === 'trips' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
+                  color: activeTab === 'trips' ? 'white' : '#6c757d',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  fontWeight: 500,
+                  transition: 'all 0.3s ease',
                 }}>
-                <span className="me-2">✨</span>
-                Generate New Trip
+                My Trips ({posts.length})
               </button>
-            </div>
-
-            {posts.length > 0 ? (
-              <div className="row g-4">
-                {posts.map((post) => (
-                  <div key={`post-container-${post._id}`} className="col-md-6 col-lg-4">
-                    <PostCard
-                      key={`post-${post._id}`}
-                      post={post}
-                      onLike={handleLikePost}
-                      onCommentClick={() => post._id && handleCommentClick(post._id)}
-                      onEdit={() => post._id && handleEditPost(post._id)}
-                      onDelete={() => post._id && handleDeletePost(post._id)}
-                      showActions={true}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-muted mb-3">You haven't planned any trips yet</p>
-                <p className="small text-muted">Click the button above to start planning!</p>
-              </div>
-            )}
-          </div>
+            </li>
+            <li className="nav-item">
+              <button 
+                className={`nav-link ${activeTab === 'wishlist' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('wishlist')}
+                style={{
+                  background: activeTab === 'wishlist' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
+                  color: activeTab === 'wishlist' ? 'white' : '#6c757d',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  fontWeight: 500,
+                  transition: 'all 0.3s ease',
+                }}>
+                My Wishlist ({wishlistItems.length})
+              </button>
+            </li>
+          </ul>
         </div>
+
+
+
+
+        {/* Content based on active tab */}
+        {activeTab === 'trips' ? (
+          // My Trips Section
+          <div className="card border-0 shadow-lg rounded-4">
+            <div className="card-body p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h3 className="h5 mb-0">My Trips</h3>
+                <button
+                  className="btn btn-outline-primary rounded-pill px-3"
+                  onClick={() => navigate('/generate-trip')}
+                  style={{
+                    borderColor: '#4158D0',
+                    color: '#4158D0',
+                  }}>
+                  <span className="me-2">✨</span>
+                  Generate New Trip
+                </button>
+              </div>
+
+              {posts.length > 0 ? (
+                <div className="row g-4">
+                  {posts.map((post) => (
+                    <div key={`post-container-${post._id}`} className="col-md-6 col-lg-4">
+                      <PostCard
+                        key={`post-${post._id}`}
+                        post={post}
+                        onLike={handleLikePost}
+                        onCommentClick={() => post._id && handleCommentClick(post._id)}
+                        onEdit={() => post._id && handleEditPost(post._id)}
+                        onDelete={() => post._id && handleDeletePost(post._id)}
+                        showActions={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted mb-3">You haven't planned any trips yet</p>
+                  <p className="small text-muted">Click the button above to start planning!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // My Wishlist Section
+          <div className="card border-0 shadow-lg rounded-4">
+            <div className="card-body p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h3 className="h5 mb-0">My Wishlist</h3>
+                <button
+                  className="btn btn-outline-primary rounded-pill px-3"
+                  onClick={() => navigate('/generate-trip')}
+                  style={{
+                    borderColor: '#4158D0',
+                    color: '#4158D0',
+                  }}>
+                  <span className="me-2">✨</span>
+                  Create More Ideas
+                </button>
+              </div>
+
+              {wishlistItems.length > 0 ? (
+                <div className="row g-4">
+                  {wishlistItems.map((item) => (
+                    <div key={`wishlist-${item.id}`} className="col-md-6 col-lg-4">
+                      <WishlistCard
+                        item={item}
+                        onDelete={handleRemoveFromWishlist}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted mb-3">Your wishlist is empty</p>
+                  <p className="small text-muted">Generate a trip and save it to your wishlist!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Footer />
     </div>
   );
 };
-
 export default ProfilePage;
