@@ -224,9 +224,18 @@ class PostService {
 
   // Add a comment
   addComment(id: string, text: string) {
+    if (!id) {
+      console.error('Post ID is required');
+      throw new Error('Post ID is required');
+    }
+  
+    console.log(`Adding comment to post ${id}`);
     return apiClient
       .post(`/posts/${id}/comment`, { text })
-      .then((response) => response.data)
+      .then((response) => {
+        console.log(`Comment added to post ${id}:`, response.data);
+        return response.data;
+      })
       .catch((error) => {
         console.error(`Error commenting on post ${id}:`, error);
         throw error;
@@ -235,9 +244,18 @@ class PostService {
 
   // Get comments for a post
   getComments(id: string) {
+    if (!id) {
+      console.error('Post ID is required');
+      throw new Error('Post ID is required');
+    }
+  
+    console.log(`Fetching comments for post ${id}`);
     return apiClient
       .get(`/posts/${id}/comments`)
-      .then((response) => response.data)
+      .then((response) => {
+        console.log(`Fetched comments for post ${id}:`, response.data);
+        return response.data;
+      })
       .catch((error) => {
         console.error(`Error fetching comments for post ${id}:`, error);
         throw error;

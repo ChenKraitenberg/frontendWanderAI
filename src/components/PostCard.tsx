@@ -7,6 +7,7 @@ import LikeButton from './LikeButton';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
 import postService from '../services/post_service';
 
+
 interface Post {
   _id: string;
   title: string;
@@ -34,7 +35,7 @@ interface Post {
 interface PostCardProps {
   post: Post;
   onLike?: (postId: string, newLikes: string[]) => void;
-  onCommentClick: () => void;
+  onCommentClick: (postId: string) => void;
   onDelete?: () => void;
   onEdit?: () => void;
   showActions?: boolean;
@@ -66,7 +67,7 @@ useEffect(() => {
   };
 
   refreshPostData();
-}, [post._id]);
+}, [post._id, post]);
 
 // Update local state when post prop changes
 useEffect(() => {
@@ -113,12 +114,22 @@ useEffect(() => {
   };
 
   const handleLikeUpdate = (newLikes: string[]) => {
+    console.log(`PostCard: handleLikeUpdate called with newLikes:`, newLikes);
     setPostLikes(newLikes);
     // Also update parent component if callback provided
     if (onLike && post._id) {
+      console.log(`PostCard: calling onLike(${post._id}, newLikes)`);
       onLike(post._id, newLikes);
+    } else {
+      console.log(`PostCard: onLike not called - missing callback or post ID`);
+      console.log(`   onLike exists: ${!!onLike}, post._id: ${post._id}`);
     }
   };
+
+  /*const handleCommentClick = (postId: string) => {
+    navigate(`/post/${postId}`, { state: { showComments: true } });
+  };*/
+
 
   return (
     <>
@@ -236,19 +247,33 @@ useEffect(() => {
         {/* Interactions Footer */}
         <div className="card-footer bg-white border-top-0 d-flex justify-content-between">
           <LikeButton 
-            postId={currentPost._id} 
+            postId={post._id} 
             initialLikes={postLikes} 
             onLikeUpdated={handleLikeUpdate} 
           />
 
-          <button 
-            className="btn btn-sm rounded-pill" 
-            onClick={onCommentClick} 
-            style={{ border: '1px solid #dee2e6' }}
-          >
-            <span className="me-2">💬</span>
-            <span>{currentPost.comments.length} Comments</span>
-          </button>
+        <button 
+          className="btn rounded-pill d-flex align-items-center gap-2"
+          onClick={() => onCommentClick(currentPost._id)} 
+          style={{
+            border: '1px solid #dee2e6',
+            background: 'white',
+            color: '#6c757d',
+            padding: '0.5rem 1rem',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f8f9fa';
+            e.currentTarget.style.color = '#495057';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'white';
+            e.currentTarget.style.color = '#6c757d';
+          }}
+        >
+          <i className="bi bi-chat me-1"></i>
+          {currentPost.comments.length} Comments
+        </button>
         </div>
       </div>
 
