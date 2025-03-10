@@ -1,4 +1,4 @@
-// user_service.ts
+// src/services/user_service.ts
 import apiClient, { CanceledError } from './api-client';
 
 export { CanceledError };
@@ -7,7 +7,7 @@ export interface User {
   _id?: string;
   email: string;
   password?: string;
-  name?: string; // Added name property
+  name?: string;
   avatar?: string | null;
 }
 
@@ -85,20 +85,13 @@ class UserService {
     };
   }
 
+  // Updated to handle multiple upload endpoints
   uploadImage(img: File) {
     const formData = new FormData();
     formData.append('file', img);
 
     const abortController = new AbortController();
-    const request = apiClient
-      .post<{ url: string }>('/file', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        signal: abortController.signal,
-      })
-      .then((response) => {
-        console.log('Full upload response:', response);
-        return response;
-      });
+    const request = this.tryMultipleUploadEndpoints(formData, abortController);
 
     return {
       request,
@@ -106,24 +99,78 @@ class UserService {
     };
   }
 
+  // Helper method to try multiple upload endpoints
+  private async tryMultipleUploadEndpoints(formData: FormData, abortController: AbortController) {
+    // Try multiple endpoints in sequence until one works
+    const endpoints = [
+      '/file', // First try the root endpoint
+      '/file/upload', // Then try the upload-specific endpoint
+      '/uploads', // Some servers use this convention
+      '/api/uploads', // Another common convention
+    ];
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Attempting to upload to endpoint: ${endpoint}`);
+        const response = await apiClient.post(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal: abortController.signal,
+          timeout: 10000, // 10 second timeout
+        });
+
+        console.log(`Upload successful to ${endpoint}:`, response);
+        return response;
+      } catch (error) {
+        console.warn(`Upload failed to ${endpoint}:`, error);
+        lastError = error;
+        // Continue to next endpoint
+      }
+    }
+
+    // If we get here, all endpoints failed
+    throw lastError || new Error('All upload endpoints failed');
+  }
+
   uploadProfileImage(file: File) {
     const formData = new FormData();
     formData.append('file', file);
 
-    return apiClient
-      .post('/file', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      .then((response) => {
-        console.log('Profile image upload response:', response.data);
+    // Try multiple endpoints in sequence
+    return this.tryUploadEndpoints(formData);
+  }
+
+  // More comprehensive helper method for profile image uploads
+  private async tryUploadEndpoints(formData: FormData) {
+    const endpoints = [
+      '/file', // First try the root endpoint
+      '/file/upload', // Then try the upload-specific endpoint
+      '/uploads', // Some servers use this convention
+      '/api/uploads', // Another common convention
+    ];
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Attempting to upload profile image to endpoint: ${endpoint}`);
+        const response = await apiClient.post(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 10000, // 10 second timeout
+        });
+
+        console.log(`Upload successful to ${endpoint}:`, response.data);
         return response.data;
-      })
-      .catch((error) => {
-        console.error('Error uploading profile image:', error);
-        throw error;
-      });
+      } catch (error) {
+        console.warn(`Upload failed to ${endpoint}:`, error);
+        lastError = error;
+        // Continue to next endpoint
+      }
+    }
+
+    // If we get here, all endpoints failed
+    throw lastError || new Error('All upload endpoints failed');
   }
 
   updateProfile(userData: Partial<User>) {
@@ -137,6 +184,15 @@ class UserService {
       })
       .then((response) => {
         console.log('Profile update response:', response.data);
+
+        // Update local storage if name or avatar was updated
+        if (userData.name) {
+          localStorage.setItem('userName', userData.name);
+        }
+        if (userData.avatar) {
+          localStorage.setItem('userAvatar', userData.avatar);
+        }
+
         return response.data;
       })
       .catch((error) => {
@@ -152,6 +208,8 @@ class UserService {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userId');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userAvatar');
       return { request: Promise.resolve() };
     }
 
@@ -170,12 +228,16 @@ class UserService {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userAvatar');
       })
       .catch((error) => {
         console.error('Logout error:', error);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userAvatar');
         throw error;
       });
 
