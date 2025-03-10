@@ -6,7 +6,7 @@ import { PostComment } from '../types';
 import LikeButton from './LikeButton';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
 import postService from '../services/post_service';
-
+import { debugImagePath } from '../utils/imageDebugUtils';
 
 interface Post {
   _id: string;
@@ -50,31 +50,30 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   const [postLikes, setPostLikes] = useState<string[]>(post.likes || []);
   const [currentPost, setCurrentPost] = useState<Post>(post);
 
-// Fetch fresh post data on mount to ensure likes are up to date
-useEffect(() => {
-  const refreshPostData = async () => {
-    try {
-      if (post && post._id) {
-        const updatedPost = await postService.getPostById(post._id);
-        if (updatedPost) {
-          setCurrentPost(updatedPost);
-          setPostLikes(updatedPost.likes || []);
+  // Fetch fresh post data on mount to ensure likes are up to date
+  useEffect(() => {
+    const refreshPostData = async () => {
+      try {
+        if (post && post._id) {
+          const updatedPost = await postService.getPostById(post._id);
+          if (updatedPost) {
+            setCurrentPost(updatedPost);
+            setPostLikes(updatedPost.likes || []);
+          }
         }
+      } catch (error) {
+        console.error('Failed to refresh post data:', error);
       }
-    } catch (error) {
-      console.error('Failed to refresh post data:', error);
-    }
-  };
+    };
 
-  refreshPostData();
-}, [post._id, post]);
+    refreshPostData();
+  }, [post._id, post]);
 
-// Update local state when post prop changes
-useEffect(() => {
-  setCurrentPost(post);
-  setPostLikes(post.likes || []);
-}, [post]);
-
+  // Update local state when post prop changes
+  useEffect(() => {
+    setCurrentPost(post);
+    setPostLikes(post.likes || []);
+  }, [post]);
 
   // Format the date
   const formatDate = (date: Date | string) => {
@@ -129,8 +128,7 @@ useEffect(() => {
   /*const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };*/
-
-
+  if (post.image) debugImagePath(post.image, 'PostCard');
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
@@ -147,17 +145,20 @@ useEffect(() => {
             cursor: 'pointer',
           }}
           onClick={() => navigate(`/post/${currentPost._id}`)}
+          // Uncomment this line for debugging:
+          // ref={() => currentPost.image && debugImagePath(currentPost.image, 'PostCard')}
         />
-
         {/* User Info Header */}
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img 
-              src={currentPost.user?.avatar ? getImageUrl(currentPost.user.avatar) : '/api/placeholder/45/45'} 
-              alt={currentPost.user?.name || 'User'} 
-              className="rounded-circle" 
-              width="45" 
-              height="45" 
+            <img
+              src={currentPost.user?.avatar ? getImageUrl(currentPost.user.avatar) : '/api/placeholder/45/45'}
+              alt={currentPost.user?.name || 'User'}
+              className="rounded-circle"
+              width="45"
+              height="45"
+              // Uncomment this line for debugging:
+              // onLoad={() => currentPost.user?.avatar && debugImagePath(currentPost.user.avatar, 'PostCard-Avatar')}
             />
           </div>
           <div>
@@ -180,11 +181,7 @@ useEffect(() => {
 
         {/* Post Content */}
         <div className="card-body">
-          <h5 
-            className="card-title fw-bold mb-2" 
-            style={{ cursor: 'pointer' }} 
-            onClick={() => navigate(`/post/${currentPost._id}`)}
-          >
+          <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${currentPost._id}`)}>
             {currentPost.title}
           </h5>
           <p
@@ -246,34 +243,29 @@ useEffect(() => {
 
         {/* Interactions Footer */}
         <div className="card-footer bg-white border-top-0 d-flex justify-content-between">
-          <LikeButton 
-            postId={post._id} 
-            initialLikes={postLikes} 
-            onLikeUpdated={handleLikeUpdate} 
-          />
+          <LikeButton postId={post._id} initialLikes={postLikes} onLikeUpdated={handleLikeUpdate} />
 
-        <button 
-          className="btn rounded-pill d-flex align-items-center gap-2"
-          onClick={() => onCommentClick(currentPost._id)} 
-          style={{
-            border: '1px solid #dee2e6',
-            background: 'white',
-            color: '#6c757d',
-            padding: '0.5rem 1rem',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f8f9fa';
-            e.currentTarget.style.color = '#495057';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'white';
-            e.currentTarget.style.color = '#6c757d';
-          }}
-        >
-          <i className="bi bi-chat me-1"></i>
-          {currentPost.comments.length} Comments
-        </button>
+          <button
+            className="btn rounded-pill d-flex align-items-center gap-2"
+            onClick={() => onCommentClick(currentPost._id)}
+            style={{
+              border: '1px solid #dee2e6',
+              background: 'white',
+              color: '#6c757d',
+              padding: '0.5rem 1rem',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.color = '#495057';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.color = '#6c757d';
+            }}>
+            <i className="bi bi-chat me-1"></i>
+            {currentPost.comments.length} Comments
+          </button>
         </div>
       </div>
 

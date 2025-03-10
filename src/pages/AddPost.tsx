@@ -1,16 +1,17 @@
-// src/pages/AddPost.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Footer from '../components/shared/Footer';
 import PostService from '../services/post_service';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import heic2any from 'heic2any';
 
 const AddPost = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -33,15 +34,46 @@ const AddPost = () => {
     }
   }, [user, navigate]);
 
-  // Handle image upload
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setFormData((prev) => ({ ...prev, image: file }));
+      setPreviewError(null);
 
-      // Display image preview
-      const fileURL = URL.createObjectURL(file);
-      setSelectedImages([fileURL]);
+      // Check if it's a HEIC/HEIF file
+      const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') || file.type.includes('image/heic') || file.type.includes('image/heif');
+
+      if (isHeic) {
+        try {
+          console.log('Converting HEIC/HEIF image for preview');
+          // Convert HEIC to JPEG for preview only
+          const jpegBlob = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.8,
+          });
+
+          // Create preview URL from the converted JPEG
+          const fileURL = URL.createObjectURL(jpegBlob as Blob);
+          setSelectedImages([fileURL]);
+        } catch (error) {
+          console.error('Error converting HEIC for preview:', error);
+          setPreviewError('Unable to generate preview for this image type, but upload will still work.');
+
+          // If conversion fails, try to show original
+          try {
+            const fileURL = URL.createObjectURL(file);
+            setSelectedImages([fileURL]);
+          } catch (e) {
+            console.error('Could not create preview for this image:', e);
+            setSelectedImages([]);
+          }
+        }
+      } else {
+        // Handle regular image formats as before
+        const fileURL = URL.createObjectURL(file);
+        setSelectedImages([fileURL]);
+      }
     }
   };
 
@@ -61,7 +93,7 @@ const AddPost = () => {
 
       // Upload image
       const imageFormData = new FormData();
-      imageFormData.append('file', formData.image);
+      imageFormData.append('image', formData.image);
 
       console.log('Uploading image...');
       const uploadResponse = await PostService.uploadImage(imageFormData);
@@ -105,6 +137,9 @@ const AddPost = () => {
       const createdPost = await PostService.createPost(postData);
       console.log('Post created successfully:', createdPost);
 
+      // Clean up any object URLs to prevent memory leaks
+      selectedImages.forEach((url) => URL.revokeObjectURL(url));
+
       // Navigate back
       toast.success('Post created successfully!');
       navigate('/profile');
@@ -120,6 +155,13 @@ const AddPost = () => {
       setLoading(false);
     }
   };
+
+  // Clean up object URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      selectedImages.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [selectedImages]);
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-light">
@@ -155,6 +197,13 @@ const AddPost = () => {
                         <input type="file" accept="image/*" className="d-none" onChange={handleImageChange} />
                       </div>
                     </label>
+
+                    {/* Preview Error Message */}
+                    {previewError && (
+                      <div className="alert alert-warning mt-2 mb-0" role="alert">
+                        {previewError}
+                      </div>
+                    )}
 
                     {/* Image Previews */}
                     {selectedImages.length > 0 && (
