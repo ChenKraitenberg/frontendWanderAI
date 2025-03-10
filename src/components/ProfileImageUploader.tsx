@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import userService from '../services/user_service';
 import { getImageUrl } from '../utils/imageUtils';
+import apiClient from '../services/api-client';
 
 interface ProfileImageUploaderProps {
   currentImage?: string | null;
@@ -11,8 +12,9 @@ interface ProfileImageUploaderProps {
 }
 
 const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({ currentImage, onImageUpdate }) => {
-  const [uploading, setUploading] = useState(false); // Move this inside the component
+  const [uploading, setUploading] = useState(false);
 
+  // src/components/ProfileImageUploader.tsx - updated handleImageChange function
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -21,11 +23,28 @@ const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({ currentImag
     try {
       setUploading(true);
 
-      // Use the uploadImage method
-      const uploadResponse = await userService.uploadImage(file);
-      const response = await uploadResponse.request;
-      const imageUrl = response.data.url;
-      // Update profile with the new avatar
+      // Create a FormData object matching the server's expectations
+      const formData = new FormData();
+
+      // Change this line - use 'image' instead of 'file' to match server expectations
+      formData.append('image', file);
+
+      console.log('Uploading file:', file.name);
+
+      // Use direct axios for debugging
+      const uploadResponse = await apiClient.post('/file/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('Upload response:', uploadResponse);
+
+      // Get the image URL
+      const imageUrl = uploadResponse.data.url;
+      console.log('Image URL:', imageUrl);
+
+      // Update profile
       await userService.updateProfile({
         avatar: imageUrl,
       });

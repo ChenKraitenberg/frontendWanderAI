@@ -6,6 +6,7 @@ import postService from '../services/post_service';
 import { Post } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import Footer from '../components/shared/Footer';
+import apiClient from '../services/api-client';
 
 const EditPostPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -86,6 +87,7 @@ const EditPostPage: React.FC = () => {
     }));
   };
 
+  // In EditPostPage.tsx - updated handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
@@ -99,8 +101,19 @@ const EditPostPage: React.FC = () => {
       if (selectedImage) {
         const imageFormData = new FormData();
         imageFormData.append('file', selectedImage);
-        const uploadResponse = await postService.uploadImage(imageFormData);
-        updatedImageUrl = uploadResponse.url;
+
+        console.log('Uploading image for post update...');
+
+        // Use apiClient directly for more control
+        const uploadResponse = await apiClient.post('/file/upload', imageFormData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        console.log('Upload response:', uploadResponse);
+        updatedImageUrl = uploadResponse.data.url;
+        console.log('New image URL:', updatedImageUrl);
       }
 
       // Update the post with new data
@@ -111,6 +124,7 @@ const EditPostPage: React.FC = () => {
         endDate: (formData.endDate as string) || '',
       };
 
+      console.log('Updating post with data:', updatedPostData);
       await postService.updatePost(id, updatedPostData);
       toast.success('Post updated successfully');
       navigate('/profile');
