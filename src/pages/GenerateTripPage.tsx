@@ -2,10 +2,9 @@
 import React, { useState } from 'react';
 import MainLayout from '../components/layouts/MainLayout';
 import { toast } from 'react-toastify';
-import { PostPreferences, GeneratedPost, ApiError, SavedPost } from '../types';
+import { PostPreferences, GeneratedPost, SavedPost } from '../types';
 import aiService from '../services/ai_service';
-import post_service from '../services/post_service';
-import { Post } from '../types';
+import wishlistService from '../services/wishlist_service';
 
 const GenerateTrip = () => {
   const [loading, setLoading] = useState(false);
@@ -53,57 +52,22 @@ const GenerateTrip = () => {
       setLoading(false);
     }
   };
+
+
   const handleSaveToWishlist = async () => {
     try {
       if (!generatedTrip) {
         toast.error('No trip to save');
         return;
       }
-
-      const tripToSave: Post = {
-        _id: '',
-        title: generatedTrip.title,
-        description: generatedTrip.description,
-        itinerary: generatedTrip.itinerary,
-        destination: preferences.destination,
-        duration: preferences.duration,
-        startDate: new Date(),
-        endDate: new Date(new Date().setDate(new Date().getDate() + parseInt(preferences.duration))),
-        price: 0,
-        //maxParticipants: 10,
-        //currentParticipants: 0,
-        image: 'https://via.placeholder.com/800x400',
-        category: preferences.category as 'RELAXED' | 'MODERATE' | 'INTENSIVE',
-        likes: [],
-        comments: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        preferences: {
-          destination: preferences.destination,
-          duration: preferences.duration,
-          category: preferences.category,
-          interests: preferences.interests || [],
-        },
-        // interests: preferences.interests || [],
-      };
-
-      console.log('About to save trip:', JSON.stringify(tripToSave, null, 2));
-      await post_service.savePost(tripToSave);
-      toast.success('הטיול נשמר בהצלחה!');
+  
+      console.log('About to save trip to wishlist:', generatedTrip);
+      const savedItem = wishlistService.addToWishlist(generatedTrip);
+      console.log('Trip saved to wishlist:', savedItem);
+      toast.success('Trip added to your wishlist!');
     } catch (error) {
-      const apiError = error as ApiError;
-      console.error('Full error details:', {
-        message: apiError.message,
-        response: apiError.response?.data,
-        status: apiError.response?.status,
-        validationErrors: apiError.response?.data?.errors,
-      });
-
-      if (apiError.response?.data?.message) {
-        toast.error(`שגיאה: ${apiError.response.data.message}`);
-      } else {
-        toast.error('שגיאה בשמירת הטיול');
-      }
+      console.error('Failed to save to wishlist:', error);
+      toast.error('Error saving the trip to your wishlist');
     }
   };
 
