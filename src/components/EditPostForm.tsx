@@ -57,14 +57,14 @@ const EditPostPage = () => {
         console.log('Post fetched for editing:', post);
 
         setFormData({
-          name: post.name || '',
-          description: post.description || '',
+          name: post.title ? post.title : '',
+          description: post.description ? post.description : '',
           startDate: post.startDate ? new Date(post.startDate) : new Date(),
           endDate: post.endDate ? new Date(post.endDate) : new Date(),
-          price: post.price || 0,
-          maxSeats: post.maxSeats || 1,
-          bookedSeats: post.bookedSeats || 0,
-          image: post.image || null,
+          price: post.price ? post.price : 0,
+          maxSeats: post.maxSeats ? post.maxSeats : 1,
+          bookedSeats: post.bookedSeats ? post.bookedSeats : 0,
+          image: post.image ? post.image : null,
           newImage: null,
         });
 

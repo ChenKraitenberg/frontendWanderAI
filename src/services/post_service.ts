@@ -228,7 +228,7 @@ class PostService {
       console.error('Post ID is required');
       throw new Error('Post ID is required');
     }
-  
+
     console.log(`Adding comment to post ${id}`);
     return apiClient
       .post(`/posts/${id}/comment`, { text })
@@ -248,7 +248,7 @@ class PostService {
       console.error('Post ID is required');
       throw new Error('Post ID is required');
     }
-  
+
     console.log(`Fetching comments for post ${id}`);
     return apiClient
       .get(`/posts/${id}/comments`)
@@ -266,7 +266,7 @@ class PostService {
   uploadImage(formData: FormData) {
     console.log('Uploading image');
     return apiClient
-      .post('/file', formData, {
+      .post('/file/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
