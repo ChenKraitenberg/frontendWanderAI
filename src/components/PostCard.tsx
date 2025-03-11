@@ -70,7 +70,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     };
 
     refreshPostData();
-  }, [post._id, post]);
+  }, [post._id, post, refreshTrigger]);
 
   useEffect(() => {
     const handleAvatarUpdate = (event: CustomEvent) => {
@@ -233,9 +233,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
     
   const displayTitle = currentPost.name || currentPost.title;
-  /*const handleCommentClick = (postId: string) => {
+
+  const handleCommentClick = (postId: string) => {
+  if (onCommentClick) {
+    onCommentClick(postId);
+  } else {
     navigate(`/post/${postId}`, { state: { showComments: true } });
-  };*/
+  }
+};
 
 
   return (
@@ -250,7 +255,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
           </div>
           <div>
             <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
-            <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
+            <small className="text-muted">{formatRelativeTime(currentPost.createdAt)}</small>
           </div>
           {/* Direct action buttons instead of dropdown */}
           {(isOwner || showActions) && (
@@ -344,7 +349,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
           <button
             className="btn rounded-pill d-flex align-items-center gap-2"
-            onClick={() => onCommentClick(currentPost._id)}
+            onClick={() => handleCommentClick(currentPost._id)}
             style={{
               border: '1px solid #dee2e6',
               background: 'white',
