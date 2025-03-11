@@ -1,6 +1,6 @@
 // src/pages/HomePage.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../components/layouts/MainLayout';
 import PostCard from '../components/PostCard';
 import postService from '../services/post_service';
@@ -9,6 +9,7 @@ import { PostComment } from '../types';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   interface Post {
     _id: string;
@@ -314,7 +315,32 @@ const HomePage: React.FC = () => {
     navigate(`/edit-post/${postId}`);
   };
 
-  
+  useEffect(() => {
+    // Only attempt to restore scroll position after posts have loaded
+    if (!loading && posts.length > 0 && location.state?.scrollPosition) {
+      // Use a small delay to ensure the DOM has updated
+      const timer = setTimeout(() => {
+        window.scrollTo({
+          top: location.state.scrollPosition,
+          behavior: 'auto'
+        });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, posts.length, location.state?.scrollPosition]);
+
+  const handlePostClick = (postId: string) => {
+    const currentScrollPosition = window.scrollY;
+
+    navigate(`/post/${postId}`, { 
+      state: { 
+        from: location.pathname,
+        scrollPosition: currentScrollPosition
+      }
+    });
+  };
+
 
   return (
     <MainLayout>
@@ -482,6 +508,7 @@ const HomePage: React.FC = () => {
                         onEdit={() => handleEditPost(post._id)}
                         onDelete={() => handleDeletePost(post._id)}
                         showActions={post.userId === userId}
+                        onPostClick={() => handlePostClick(post._id)}
                       />
                     </div>
                   );

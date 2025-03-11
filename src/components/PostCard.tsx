@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getImageUrl } from '../utils/imageUtils';
 import { PostComment } from '../types';
 import LikeButton from './LikeButton';
@@ -39,10 +39,12 @@ interface PostCardProps {
   onDelete?: () => void;
   onEdit?: () => void;
   showActions?: boolean;
+  onPostClick?: () => void;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDelete, onEdit, showActions = true }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommentClick, onDelete, onEdit, showActions = true }) => {
   const navigate = useNavigate();
+  const location = useLocation(); 
   const userId = localStorage.getItem('userId');
   const isOwner = userId === post.userId;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -51,6 +53,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [refreshTrigger, setRefreshTrigger] = useState(Date.now());
 
+  
   // Function to update current post with latest user info from localStorage
   const updatePostWithLatestUserInfo = useCallback(() => {
     if (post.userId === userId && post.user) {
@@ -270,6 +273,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   }
 };
 
+const handlePostClick = () => {
+  if (onPostClick) {
+    onPostClick(); 
+  } else {
+    const currentScrollPosition = window.scrollY;
+    navigate(`/post/${post._id}`, { 
+      state: { 
+        from: location.pathname,
+        scrollPosition: currentScrollPosition
+      }
+    });
+  }
+};
 
   return (
     <>
@@ -304,10 +320,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
         </div>
 
         {/* Post Content */}
+        <div onClick={handlePostClick}>
         <div className="card-body">
-          <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${currentPost._id}`)}>
+        <h5 
+            className="card-title fw-bold mb-2" 
+            style={{ cursor: 'pointer' }} 
+            onClick={handlePostClick}
+          >
             {displayTitle}
           </h5>
+          </div>
 
           {/* Destination display */}
           {currentPost.destination && (

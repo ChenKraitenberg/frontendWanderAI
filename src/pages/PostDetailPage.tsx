@@ -9,6 +9,7 @@ import { Post } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
 
+
 const PostDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -91,12 +92,19 @@ const PostDetailPage: React.FC = () => {
           const timestamp = Date.now();
           imgElement.src = `${imgElement.src.split('?')[0]}?t=${timestamp}`;
         }
+        
       });
     };
 
     // Call it once on component mount and whenever the trigger changes
     updateUserAvatars();
   }, [forceRefresh, showComments]);
+
+  useEffect(() => {
+    if (window.history.state && window.history.state.scrollPosition) {
+      window.scrollTo(0, window.history.state.scrollPosition);
+    }
+  }, []);
 
   // Handle new comment added
   const handleCommentAdded = useCallback(() => {
@@ -211,6 +219,24 @@ const PostDetailPage: React.FC = () => {
   
   return (
     <MainLayout>
+      <button 
+        className="btn btn-outline-secondary mb-3"
+        onClick={() => {
+          const prevPath = location.state?.from || '/';
+          const prevScrollPosition = location.state?.scrollPosition || 0;
+          
+          navigate(prevPath, {
+            state: {
+              scrollPosition: prevScrollPosition
+            },
+            replace: true // Add this to replace the current history entry
+          });
+        }}
+      >
+        <i className="bi bi-arrow-left me-2"></i>
+        Back to Feed
+      </button>
+    
       <div className="container py-5">
         {/* Two-Column Layout: Post Content and Image */}
         <div className="row mb-4">
