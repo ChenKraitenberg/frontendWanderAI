@@ -49,7 +49,6 @@ export interface Post {
   duration: string;
   itinerary?: string[];
   preferences?: PostPreferences;
-  name?: string;
 }
 
 export interface GeneratedPost {
@@ -67,6 +66,7 @@ export interface GeneratedPost {
   createdAt?: Date;
   updatedAt?: Date;
   preferences?: PostPreferences;
+  
 }
 
 export interface SavedPost {

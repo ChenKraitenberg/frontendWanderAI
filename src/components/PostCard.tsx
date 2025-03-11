@@ -127,7 +127,25 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     };
 
     refreshPostData();
-  }, [post._id, userId]);
+  }, [post._id, post, refreshTrigger]);
+
+  useEffect(() => {
+    const handleAvatarUpdate = (event: CustomEvent) => {
+      console.log('Avatar update event received:', event.detail);
+      setRefreshTrigger(Date.now());
+    };
+
+    window.addEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+    };
+  }, []);
+  // Update local state when post prop changes
+  useEffect(() => {
+    setCurrentPost(post);
+    setPostLikes(post.likes || []);
+  }, [post]);
 
   // Format the date
   const formatDate = (date: Date | string) => {
@@ -244,6 +262,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
   const displayTitle = currentPost.name || currentPost.title;
 
+  const handleCommentClick = (postId: string) => {
+  if (onCommentClick) {
+    onCommentClick(postId);
+  } else {
+    navigate(`/post/${postId}`, { state: { showComments: true } });
+  }
+};
+
+
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
@@ -261,7 +288,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
           </div>
           <div>
             <h6 className="mb-0 fw-bold">{getUserDisplayName()}</h6>
-            <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
+            <small className="text-muted">{formatRelativeTime(currentPost.createdAt)}</small>
           </div>
           {/* Direct action buttons instead of dropdown */}
           {(isOwner || showActions) && (
@@ -355,7 +382,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
 
           <button
             className="btn rounded-pill d-flex align-items-center gap-2"
-            onClick={() => onCommentClick(currentPost._id)}
+            onClick={() => handleCommentClick(currentPost._id)}
             style={{
               border: '1px solid #dee2e6',
               background: 'white',

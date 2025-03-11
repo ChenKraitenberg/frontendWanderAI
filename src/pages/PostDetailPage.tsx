@@ -208,6 +208,7 @@ const PostDetailPage: React.FC = () => {
     );
   }
 
+  
   return (
     <MainLayout>
       <div className="container py-5">
