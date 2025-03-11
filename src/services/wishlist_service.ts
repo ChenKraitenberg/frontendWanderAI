@@ -13,16 +13,30 @@ export interface WishlistItem {
   category: 'RELAXED' | 'MODERATE' | 'INTENSIVE';
   itinerary?: string[];
   createdAt: string;
-  image?: string;
+  userId?: string;
 }
 
 class WishlistService {
-  private readonly STORAGE_KEY = 'travel_app_wishlist';
+    private readonly STORAGE_KEY_PREFIX = 'travel_app_wishlist_';
+
 
   // Get all wishlist items
-  getWishlistItems = (): WishlistItem[] => {
+  private getUserStorageKey(): string {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      console.warn('No user ID found in localStorage, using default key');
+      return this.STORAGE_KEY_PREFIX + 'anonymous';
+    }
+    return this.STORAGE_KEY_PREFIX + userId;
+  }
+
+   // Get all wishlist items for the current user
+   getWishlistItems = (): WishlistItem[] => {
     try {
-      const wishlistJson = localStorage.getItem(this.STORAGE_KEY);
+      const storageKey = this.getUserStorageKey();
+      const wishlistJson = localStorage.getItem(storageKey);
+      console.log(`Fetching wishlist items for user with storage key: ${storageKey}`);
+      
       if (!wishlistJson) return [];
       return JSON.parse(wishlistJson);
     } catch (error) {
@@ -31,9 +45,17 @@ class WishlistService {
     }
   };
 
-  // Add an item to wishlist
+
+  
+  // Add an item to wishlist for the current user
   addToWishlist = (tripData: GeneratedPost): WishlistItem => {
     try {
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) {
+        console.warn('No user ID found when adding to wishlist');
+      }
+      
       // Create new wishlist item
       const newItem: WishlistItem = {
         id: `wish_${Date.now()}`,
@@ -43,16 +65,19 @@ class WishlistService {
         duration: tripData.duration,
         category: tripData.category,
         itinerary: tripData.itinerary,
-        image: tripData.imageUrl,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        userId: userId || undefined // Store the userId with the item
       };
 
-      // Get current items and add the new one
+      // Get current items for this user and add the new one
+      const storageKey = this.getUserStorageKey();
       const currentItems = this.getWishlistItems();
       const updatedItems = [...currentItems, newItem];
 
-      // Save back to localStorage
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedItems));
+      console.log(`Adding new item to wishlist for user with storage key: ${storageKey}`);
+      
+      // Save back to localStorage with user-specific key
+      localStorage.setItem(storageKey, JSON.stringify(updatedItems));
       
       return newItem;
     } catch (error) {
@@ -61,12 +86,16 @@ class WishlistService {
     }
   };
 
-  // Remove an item from wishlist
+  // Remove an item from wishlist for the current user
   removeFromWishlist = (itemId: string): void => {
     try {
+      const storageKey = this.getUserStorageKey();
       const currentItems = this.getWishlistItems();
       const updatedItems = currentItems.filter(item => item.id !== itemId);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedItems));
+      
+      console.log(`Removing item ${itemId} from wishlist for storage key: ${storageKey}`);
+      
+      localStorage.setItem(storageKey, JSON.stringify(updatedItems));
     } catch (error) {
       console.error('Error removing from wishlist:', error);
       throw error;
