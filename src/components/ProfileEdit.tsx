@@ -1,4 +1,6 @@
+// Enhanced ProfileEdit component to better handle updates
 // src/components/ProfileEdit.tsx
+
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import ProfileImageUploader from './ProfileImageUploader';
@@ -20,52 +22,95 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
   const [name, setName] = useState(user.name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatar || null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const { updateUserProfile } = useAuth();
 
   const handleProfileImageUpdate = (newImageUrl: string) => {
     setAvatarUrl(newImageUrl);
+    setHasChanges(true);
   };
 
-  // In ProfileEdit.tsx - handleSubmit function
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setName(newName);
+    setHasChanges(newName !== user.name);
+  };
+
+  // Comprehensive profile update handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isSubmitting) return;
+    if (!hasChanges) {
+      toast.info('No changes to save');
+      onCancel();
+      return;
+    }
 
     try {
       setIsSubmitting(true);
 
-      // First update the profile itself
-      const updatedData = {
-        name: name.trim(),
-        avatar: avatarUrl || undefined,
-      };
+      // Build the update data object
+      const updatedData: { name?: string; avatar?: string } = {};
 
-      // Use the updateUserProfile function from AuthContext
-      await updateUserProfile(updatedData);
-
-      // Now explicitly update all posts
-      try {
-        const userId = user._id;
-        if (userId) {
-          toast.info('Updating your posts with new profile information...');
-
-          // Call our new function directly
-          const updatedCount = await postService.updateUserInfoInAllPosts(userId, {
-            name: name.trim(),
-            avatar: avatarUrl || undefined,
-          });
-
-          toast.success(`Successfully updated ${updatedCount} posts with your new profile information`);
-        }
-      } catch (postsError) {
-        console.error('Error updating posts:', postsError);
-        toast.warning('Your profile was updated, but there was an issue updating your posts');
+      // Only include fields that changed
+      if (name !== user.name) {
+        updatedData.name = name.trim();
       }
 
-      // Notify parent component of changes
+      if (avatarUrl !== user.avatar) {
+        updatedData.avatar = avatarUrl || undefined;
+      }
+
+      // If we have no changes, just return
+      if (Object.keys(updatedData).length === 0) {
+        toast.info('No changes to save');
+        onCancel();
+        return;
+      }
+
+      // Step 1: Update the user profile
+      await updateUserProfile(updatedData);
+
+      // Step 2: Store updated values in localStorage for immediate access
+      if (updatedData.name) {
+        localStorage.setItem('userName', updatedData.name);
+      }
+      if (updatedData.avatar) {
+        localStorage.setItem('userAvatar', updatedData.avatar);
+        localStorage.setItem('userAvatarTimestamp', Date.now().toString());
+      }
+
+      // Step 3: Update posts and comments for comprehensive updates
+      try {
+        toast.info('Updating your content with new profile information...');
+
+        const userId = user._id;
+        const updateResults = await postService.updateUserInfoEverywhere(userId, updatedData);
+
+        toast.success(`Profile updated! Changes applied to ${updateResults.posts} posts and comments in ${updateResults.comments} posts.`);
+
+        // Force a refresh to ensure all content is updated
+        await postService.forceRefreshUserContent(userId);
+      } catch (updateError) {
+        console.error('Error during content update:', updateError);
+        toast.warning('Your profile was updated, but there was an issue updating some of your content.');
+      }
+
+      // Step 4: Notify parent component about the update
       onUpdate(updatedData);
+
+      // Step 5: Trigger an event for real-time updates in other components
+      window.dispatchEvent(
+        new CustomEvent('user-profile-updated', {
+          detail: {
+            userId: user._id,
+            updates: updatedData,
+            timestamp: Date.now(),
+          },
+        })
+      );
     } catch (error) {
       console.error('Failed to update profile:', error);
       toast.error('Failed to update profile. Please try again.');
@@ -89,7 +134,16 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
           {/* Name Field */}
           <div className="mb-4">
             <label className="form-label">Display Name</label>
-            <input type="text" className="form-control form-control-lg rounded-pill" placeholder="Enter your display name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              type="text"
+              className="form-control form-control-lg rounded-pill"
+              placeholder="Enter your display name"
+              value={name}
+              onChange={handleNameChange}
+              required
+              minLength={2}
+              maxLength={50}
+            />
             <div className="form-text">This name will be visible to others on your posts and comments</div>
           </div>
 
@@ -105,7 +159,11 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
             <button type="button" className="btn btn-outline-secondary rounded-pill px-4" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </button>
-            <button type="submit" className="btn rounded-pill px-4 text-white" style={{ background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)', border: 'none' }} disabled={isSubmitting}>
+            <button
+              type="submit"
+              className="btn rounded-pill px-4 text-white"
+              style={{ background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)', border: 'none' }}
+              disabled={isSubmitting || !hasChanges}>
               {isSubmitting ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

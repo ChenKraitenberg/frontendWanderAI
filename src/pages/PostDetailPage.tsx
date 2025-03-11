@@ -1,5 +1,4 @@
-// src/pages/PostDetailPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import postService from '../services/post_service';
@@ -18,56 +17,105 @@ const PostDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(Date.now()); // Used to force re-renders of images
   const userId = localStorage.getItem('userId');
   const isOwner = userId && post?.userId === userId;
   const [commentCount, setCommentCount] = useState<number>(0);
 
-  
   // Check if showComments state was passed through location
   useEffect(() => {
     console.log('Location state:', location.state);
-  if (location.state && 'showComments' in location.state) {
-    console.log('Setting showComments to:', location.state.showComments);
-    setShowComments(location.state.showComments === true);
+    if (location.state && 'showComments' in location.state) {
+      console.log('Setting showComments to:', location.state.showComments);
+      setShowComments(location.state.showComments === true);
     }
   }, [location.state]);
 
-  useEffect(() => {
-    console.log('showComments state is now:', showComments);
-  }, [showComments]);
+  // Function to fetch post data - extracted for reuse
+  const fetchPostData = useCallback(async () => {
+    if (!id) return;
 
-  useEffect(() => {
-    const fetchPost = async () => {
-      if (!id) return;
-
-      try {
-        setLoading(true);
-        const fetchedPost = await postService.getPostById(id);
-        setPost(fetchedPost);
-        setCommentCount(fetchedPost.comments?.length || 0);
-      } catch (error) {
-        console.error('Failed to fetch post:', error);
-        setError('Failed to load post. Please try again later.');
-        toast.error('Failed to load post');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPost();
+    try {
+      setLoading(true);
+      console.log(`Fetching post with ID: ${id}`);
+      const fetchedPost = await postService.getPostById(id);
+      console.log('Fetched post details:', fetchedPost);
+      setPost(fetchedPost);
+      setCommentCount(fetchedPost.comments?.length || 0);
+      return fetchedPost;
+    } catch (error) {
+      console.error('Failed to fetch post:', error);
+      setError('Failed to load post. Please try again later.');
+      toast.error('Failed to load post');
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const handleCommentAdded = () => {
-    setCommentCount(prevCount => prevCount + 1);
-  };
+  // Initial post fetch
+  useEffect(() => {
+    fetchPostData();
+  }, [fetchPostData]);
+
+  // Listen for profile updates
+  useEffect(() => {
+    const handleProfileUpdate = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('Profile update event received in PostDetailPage:', customEvent.detail);
+
+      // Force re-render by updating the timestamp
+      setForceRefresh(Date.now());
+
+      // Also refresh the post data
+      await fetchPostData();
+    };
+
+    // Add event listener for profile updates
+    window.addEventListener('user-avatar-updated', handleProfileUpdate);
+
+    // Clean up
+    return () => {
+      window.removeEventListener('user-avatar-updated', handleProfileUpdate);
+    };
+  }, [fetchPostData]);
+
+  // Force image refreshes when the component mounts or refreshTrigger changes
+  useEffect(() => {
+    // Function to update all user avatars in the page
+    const updateUserAvatars = () => {
+      document.querySelectorAll('img.user-avatar-img').forEach((img) => {
+        const imgElement = img as HTMLImageElement;
+        if (imgElement.src && !imgElement.src.startsWith('data:')) {
+          // Add timestamp parameter to force refresh
+          const timestamp = Date.now();
+          imgElement.src = `${imgElement.src.split('?')[0]}?t=${timestamp}`;
+        }
+      });
+    };
+
+    // Call it once on component mount and whenever the trigger changes
+    updateUserAvatars();
+  }, [forceRefresh, showComments]);
+
+  // Handle new comment added
+  const handleCommentAdded = useCallback(() => {
+    setCommentCount((prevCount) => prevCount + 1);
+
+    // Refresh the post to get updated comment data
+    fetchPostData();
+
+    // Also force re-render of images
+    setForceRefresh(Date.now());
+  }, [fetchPostData]);
 
   const handleLikeUpdate = async (newLikes: string[]) => {
     if (!post) return;
-    
+
     try {
       setPost({
         ...post,
-        likes: newLikes
+        likes: newLikes,
       });
     } catch (error) {
       console.error('Error updating likes:', error);
@@ -105,16 +153,35 @@ const PostDetailPage: React.FC = () => {
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return diffDays;
   };
 
- // Get the display title - prefer name field if available, fallback to title
- const getDisplayTitle = () => {
-  if (!post) return '';
-  return post.title;
-};
+  // Get the display title - prefer name field if available, fallback to title
+  const getDisplayTitle = () => {
+    if (!post) return '';
+    return post.title;
+  };
 
+  // Get user's avatar with cache busting
+  const getUserAvatar = (avatarPath: string | null | undefined) => {
+    // If it's the current user, check localStorage first
+    if (post?.userId === userId) {
+      const localAvatar = localStorage.getItem('userAvatar');
+      if (localAvatar) {
+        // If it's a data URL, return as is
+        if (localAvatar.startsWith('data:')) return localAvatar;
+
+        // Otherwise add cache-busting parameter
+        return `${getImageUrl(localAvatar)}?t=${forceRefresh}`;
+      }
+    }
+
+    if (!avatarPath) return '/api/placeholder/48/48';
+
+    // Add cache-busting parameter
+    return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
+  };
 
   if (loading) {
     return (
@@ -132,21 +199,14 @@ const PostDetailPage: React.FC = () => {
     return (
       <MainLayout>
         <div className="container py-5">
-          <div className="alert alert-danger">
-            {error || 'Post not found'}
-          </div>
-          <button 
-            className="btn btn-primary mt-3" 
-            onClick={() => navigate('/')}
-          >
+          <div className="alert alert-danger">{error || 'Post not found'}</div>
+          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
             Back to Home
           </button>
         </div>
       </MainLayout>
     );
   }
-
-  
 
   return (
     <MainLayout>
@@ -160,38 +220,30 @@ const PostDetailPage: React.FC = () => {
                 {/* User Info */}
                 <div className="d-flex align-items-center mb-4">
                   <div className="flex-shrink-0">
-                    <img 
-                      src={post.user?.avatar ? getImageUrl(post.user.avatar) : '/api/placeholder/48/48'} 
-                      alt={post.user?.name || 'User'} 
-                      className="rounded-circle" 
+                    <img
+                      src={getUserAvatar(post.user?.avatar)}
+                      alt={post.user?.name || 'User'}
+                      className="rounded-circle user-avatar-img"
                       style={{ width: '48px', height: '48px', objectFit: 'cover' }}
                     />
                   </div>
                   <div className="ms-3">
                     <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
-                    <p className="text-muted small mb-0">
-                      Posted on {formatDate(post.createdAt)}
-                    </p>
+                    <p className="text-muted small mb-0">Posted on {formatDate(post.createdAt)}</p>
                   </div>
-  
+
                   {isOwner && (
                     <div className="ms-auto">
-                      <button 
-                        className="btn btn-outline-primary btn-sm me-2" 
-                        onClick={handleEditPost}
-                      >
+                      <button className="btn btn-outline-primary btn-sm me-2" onClick={handleEditPost}>
                         Edit
                       </button>
-                      <button 
-                        className="btn btn-outline-danger btn-sm" 
-                        onClick={handleDeletePost}
-                      >
+                      <button className="btn btn-outline-danger btn-sm" onClick={handleDeletePost}>
                         Delete
                       </button>
                     </div>
                   )}
                 </div>
-  
+
                 {/* Title and Category */}
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <h1 className="card-title h3 fw-bold">{getDisplayTitle()}</h1>
@@ -208,13 +260,12 @@ const PostDetailPage: React.FC = () => {
                         color: 'white',
                         fontSize: '0.8rem',
                         padding: '0.5rem 1rem',
-                      }}
-                    >
+                      }}>
                       {post.category}
                     </span>
                   )}
                 </div>
-  
+
                 {/* Trip Details */}
                 <div className="row mb-4">
                   {post.startDate && post.endDate && (
@@ -230,14 +281,12 @@ const PostDetailPage: React.FC = () => {
                           <p className="mb-0">
                             {formatDate(post.startDate)} - {formatDate(post.endDate)}
                           </p>
-                          <p className="small text-muted mb-0">
-                            {calculateDuration(post.startDate, post.endDate)} days
-                          </p>
+                          <p className="small text-muted mb-0">{calculateDuration(post.startDate, post.endDate)} days</p>
                         </div>
                       </div>
                     </div>
                   )}
-  
+
                   {post.price !== undefined && (
                     <div className="col-md-4 mb-3 mb-md-0">
                       <div className="d-flex align-items-center">
@@ -249,14 +298,12 @@ const PostDetailPage: React.FC = () => {
                         <div className="ms-3">
                           <h6 className="mb-0 small fw-bold text-muted">Price</h6>
                           <p className="mb-0">${post.price}</p>
-                          <p className="small text-muted mb-0">
-                            per person
-                          </p>
+                          <p className="small text-muted mb-0">per person</p>
                         </div>
                       </div>
                     </div>
                   )}
-  
+
                   {post.maxSeats && (
                     <div className="col-md-4">
                       <div className="d-flex align-items-center">
@@ -268,15 +315,13 @@ const PostDetailPage: React.FC = () => {
                         <div className="ms-3">
                           <h6 className="mb-0 small fw-bold text-muted">Availability</h6>
                           <p className="mb-0">{post.maxSeats} seats</p>
-                          <p className="small text-muted mb-0">
-                            {post.bookedSeats || 0} booked
-                          </p>
+                          <p className="small text-muted mb-0">{post.bookedSeats || 0} booked</p>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-  
+
                 {/* Description */}
                 <div className="mb-4">
                   <h5 className="fw-bold">About This Trip</h5>
@@ -284,7 +329,7 @@ const PostDetailPage: React.FC = () => {
                     {post.description}
                   </p>
                 </div>
-  
+
                 {/* Destination */}
                 {post.destination && (
                   <div className="mb-4">
@@ -295,66 +340,59 @@ const PostDetailPage: React.FC = () => {
                     </p>
                   </div>
                 )}
-  
+
                 {/* Actions Row */}
                 <div className="border-top pt-4 mt-4">
                   <div className="d-flex justify-content-between">
-                    <LikeButton 
-                      postId={post._id} 
-                      initialLikes={post.likes} 
-                      onLikeUpdated={handleLikeUpdate} 
-                    />
-                    
-                    <button 
+                    <LikeButton postId={post._id} initialLikes={post.likes} onLikeUpdated={handleLikeUpdate} />
+
+                    <button
                       className="btn rounded-pill d-flex align-items-center gap-2"
                       onClick={() => setShowComments(!showComments)}
                       style={{
                         border: 'none',
                         background: showComments ? 'rgba(13, 110, 253, 0.1)' : 'rgba(0, 0, 0, 0.05)',
                         color: showComments ? '#0d6efd' : '#6c757d',
-                        padding: '0.5rem 1rem'
-                      }}
-                    >
+                        padding: '0.5rem 1rem',
+                      }}>
                       <i className={`bi ${showComments ? 'bi-chat-fill' : 'bi-chat'}`}></i>
-                      <span>
-                      {commentCount} Comments
-                      </span>
+                      <span>{commentCount} Comments</span>
                     </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-  
+
           {/* Post Image (Right Column) */}
           <div className="col-lg-5">
             <div className="card border-0 shadow-sm rounded-4 h-100">
-              <div 
+              <div
                 className="h-100 rounded-4"
                 style={{
                   height: '100%',
-                  backgroundImage: post.image ? `url(${getImageUrl(post.image)})` : 'url(/api/placeholder/800/600)',
+                  backgroundImage: post.image ? `url(${getImageUrl(post.image)}?t=${forceRefresh})` : 'url(/api/placeholder/800/600)',
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
-                  minHeight: '400px'
+                  minHeight: '400px',
                 }}
               />
             </div>
           </div>
         </div>
-  
+
         {/* Comments Section (Full Width) */}
         {showComments && (
           <div className="row">
             <div className="col-12">
               <div className="card shadow-sm border-0 rounded-4 mb-4">
                 <div className="card-body p-4">
-                  <h4 className="mb-4">Comments</h4>
-                  <CommentSection 
-                    postId={post._id} 
+                  <CommentSection
+                    postId={post._id}
                     initialComments={post.comments || []}
                     commentCount={commentCount}
-                    onCommentAdded={handleCommentAdded} 
+                    onCommentAdded={handleCommentAdded}
+                    key={`comments-${forceRefresh}`} // Force re-render when refreshing
                   />
                 </div>
               </div>
@@ -363,7 +401,7 @@ const PostDetailPage: React.FC = () => {
         )}
       </div>
     </MainLayout>
-  )
-  };
+  );
+};
 
 export default PostDetailPage;

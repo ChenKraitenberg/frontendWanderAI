@@ -1,12 +1,10 @@
-// src/components/PostCard.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../utils/imageUtils';
 import { PostComment } from '../types';
 import LikeButton from './LikeButton';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog';
 import postService from '../services/post_service';
-import { debugImagePath } from '../utils/imageDebugUtils';
 
 interface Post {
   _id: string;
@@ -53,6 +51,51 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [refreshTrigger, setRefreshTrigger] = useState(Date.now());
 
+  // Function to update current post with latest user info from localStorage
+  const updatePostWithLatestUserInfo = useCallback(() => {
+    if (post.userId === userId && post.user) {
+      const storedName = localStorage.getItem('userName');
+      const storedAvatar = localStorage.getItem('userAvatar');
+
+      // Create a new post object with updated user info
+      const updatedPost = {
+        ...post,
+        user: {
+          ...post.user,
+          name: storedName || post.user.name,
+          avatar: storedAvatar || post.user.avatar,
+        },
+      };
+
+      setCurrentPost(updatedPost);
+    }
+  }, [post, userId]);
+
+  // Update post with latest user info on mount and when post changes
+  useEffect(() => {
+    updatePostWithLatestUserInfo();
+  }, [post, updatePostWithLatestUserInfo]);
+
+  // Listen for profile updates
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      console.log(`PostCard: Profile update detected for post ${post._id}`);
+      updatePostWithLatestUserInfo();
+      setRefreshTrigger(Date.now());
+    };
+
+    // Listen for custom events for profile updates
+    window.addEventListener('user-avatar-updated', handleProfileUpdate);
+    window.addEventListener('user-profile-updated', handleProfileUpdate);
+    window.addEventListener('user-info-updated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('user-avatar-updated', handleProfileUpdate);
+      window.removeEventListener('user-profile-updated', handleProfileUpdate);
+      window.removeEventListener('user-info-updated', handleProfileUpdate);
+    };
+  }, [updatePostWithLatestUserInfo, post._id]);
+
   // Fetch fresh post data on mount to ensure likes are up to date
   useEffect(() => {
     const refreshPostData = async () => {
@@ -60,6 +103,20 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
         if (post && post._id) {
           const updatedPost = await postService.getPostById(post._id);
           if (updatedPost) {
+            // Preserve local overrides for current user
+            if (updatedPost.userId === userId && updatedPost.user) {
+              const storedName = localStorage.getItem('userName');
+              const storedAvatar = localStorage.getItem('userAvatar');
+
+              if (storedName || storedAvatar) {
+                updatedPost.user = {
+                  ...updatedPost.user,
+                  name: storedName || updatedPost.user.name,
+                  avatar: storedAvatar || updatedPost.user.avatar,
+                };
+              }
+            }
+
             setCurrentPost(updatedPost);
             setPostLikes(updatedPost.likes || []);
           }
@@ -70,25 +127,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     };
 
     refreshPostData();
-  }, [post._id, post]);
-
-  useEffect(() => {
-    const handleAvatarUpdate = (event: CustomEvent) => {
-      console.log('Avatar update event received:', event.detail);
-      setRefreshTrigger(Date.now());
-    };
-
-    window.addEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
-
-    return () => {
-      window.removeEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
-    };
-  }, []);
-  // Update local state when post prop changes
-  useEffect(() => {
-    setCurrentPost(post);
-    setPostLikes(post.likes || []);
-  }, [post]);
+  }, [post._id, userId]);
 
   // Format the date
   const formatDate = (date: Date | string) => {
@@ -96,7 +135,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
-  // Format relative time for post creation (e.g., "2 hours ago", "3 days ago")
+  // Format relative time for post creation
   const formatRelativeTime = (date: Date | string) => {
     const now = new Date();
     const postDate = new Date(date);
@@ -104,7 +143,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     const diffMinutes = Math.floor(diffTime / (1000 * 60));
     const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffMinutes < 1) {
       return 'Just now';
     } else if (diffMinutes < 60) {
@@ -117,7 +156,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
       return `Posted on ${formatDate(date)}`;
     }
   };
-
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
@@ -163,93 +201,66 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     }
   };
 
-
-  if (post.image) debugImagePath(post.image, 'PostCard');
-
-  const getUserAvatar = (user?: { _id: string; email: string; name?: string; avatar?: string }): string => {
-    // Add a unique timestamp to avoid browser caching
-    const timestamp = new Date().getTime();
-
+  // Get the user's avatar with cache busting
+  const getUserAvatar = () => {
     // If the user is the current logged-in user, use potentially updated avatar from localStorage
-    if (user?._id === userId) {
-      const currentUserAvatar = localStorage.getItem('userAvatar');
-      if (currentUserAvatar) {
+    if (currentPost.user?._id === userId) {
+      const storedAvatar = localStorage.getItem('userAvatar');
+      if (storedAvatar) {
         // Don't add timestamp to data URLs
-        if (currentUserAvatar.startsWith('data:')) {
-          return currentUserAvatar;
+        if (storedAvatar.startsWith('data:')) {
+          return storedAvatar;
         }
-        return `${getImageUrl(currentUserAvatar)}?nocache=${timestamp}`;
+        return `${getImageUrl(storedAvatar)}?nocache=${refreshTrigger}`;
       }
     }
 
     // If user has an avatar, use it
-    if (user?.avatar) {
+    if (currentPost.user?.avatar) {
       // Don't add timestamp to data URLs
-      if (user.avatar.startsWith('data:')) {
-        return user.avatar;
+      if (currentPost.user.avatar.startsWith('data:')) {
+        return currentPost.user.avatar;
       }
-      return `${getImageUrl(user.avatar)}?nocache=${timestamp}`;
+      return `${getImageUrl(currentPost.user.avatar)}?nocache=${refreshTrigger}`;
     }
 
     // Default avatar if nothing else is available
     return '/assets/default-avatar.png';
   };
 
-  const getUserDisplayName = (user?: { name?: string; email?: string }): string => {
-    return user?.name || user?.email || 'Anonymous';
+  // Get user's display name, preferring localStorage for current user
+  const getUserDisplayName = () => {
+    // If it's the current user, check localStorage first for most up-to-date name
+    if (currentPost.user?._id === userId) {
+      const storedName = localStorage.getItem('userName');
+      if (storedName) {
+        return storedName;
+      }
+    }
+
+    // Otherwise use what's in the post
+    return currentPost.user?.name || currentPost.user?.email || 'Anonymous';
   };
 
-  // Add this just before the return statement in PostCard.tsx
-  // In PostCard.tsx, modify the useEffect for avatar updates
-  useEffect(() => {
-    // Only check once, no interval (to avoid excessive rendering)
-    const checkForAvatarUpdates = () => {
-      const lastUpdateTime = localStorage.getItem('userAvatarTimestamp');
-
-      // Only update if there's been a change since component mounted
-      if (lastUpdateTime && parseInt(lastUpdateTime) > initialRenderTime) {
-        // Just update the avatar, not the entire post data
-        if (post.user?._id === userId) {
-          // Create a shallow copy to trigger re-render, but preserve all data
-          const updatedUser = { ...post.user };
-
-          // No need to modify the avatar here, the getUserAvatar function will handle it
-          setCurrentPost((prev) => ({
-            ...prev,
-            user: updatedUser,
-          }));
-        }
-      }
-    };
-
-    // Store the time this component initially rendered
-    const initialRenderTime = Date.now();
-
-    // Check only once after a short delay (to allow for profile update to complete)
-    const timeoutId = setTimeout(checkForAvatarUpdates, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [userId, post.user?._id]);
-
-    
   const displayTitle = currentPost.name || currentPost.title;
-  /*const handleCommentClick = (postId: string) => {
-    navigate(`/post/${postId}`, { state: { showComments: true } });
-  };*/
-
 
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
         {/* Post Image */}
-        <img src={post.image ? getImageUrl(post.image) : '/assets/placeholder-image.jpg'} alt={post.title} className="card-img-top rounded-top" style={{ objectFit: 'cover', height: '200px' }} />
+        <img
+          src={currentPost.image ? getImageUrl(currentPost.image) : '/assets/placeholder-image.jpg'}
+          alt={currentPost.title}
+          className="card-img-top rounded-top"
+          style={{ objectFit: 'cover', height: '200px' }}
+        />
 
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img src={getUserAvatar(post.user)} alt={getUserDisplayName(post.user)} className="rounded-circle user-avatar-img" width="45" height="45" style={{ objectFit: 'cover' }} />
+            <img src={getUserAvatar()} alt={getUserDisplayName()} className="rounded-circle user-avatar-img" width="45" height="45" style={{ objectFit: 'cover' }} />
           </div>
           <div>
-            <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
+            <h6 className="mb-0 fw-bold">{getUserDisplayName()}</h6>
             <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
           </div>
           {/* Direct action buttons instead of dropdown */}
@@ -268,11 +279,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
         {/* Post Content */}
         <div className="card-body">
           <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${currentPost._id}`)}>
-           {displayTitle}
+            {displayTitle}
           </h5>
 
-           {/* Destination display */}
-           {currentPost.destination && (
+          {/* Destination display */}
+          {currentPost.destination && (
             <div className="mb-2">
               <small className="text-muted d-flex align-items-center">
                 <i className="bi bi-geo-alt me-1"></i>

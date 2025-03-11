@@ -1,12 +1,10 @@
 // src/components/CommentSection.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import postService from '../services/post_service';
 import { PostComment } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
-
-
 
 interface CommentSectionProps {
   postId: string;
@@ -20,40 +18,110 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  //const userId = localStorage.getItem('userId');
+  const [avatarRefreshKey, setAvatarRefreshKey] = useState(Date.now()); // For forcing image refreshes
+  const userId = localStorage.getItem('userId');
+  const userAvatar = localStorage.getItem('userAvatar');
+  const userName = localStorage.getItem('userName');
+
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
+
+  // Set up cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Initialize comments from props when they change
+  useEffect(() => {
+    if (initialComments.length > 0) {
+      setComments(initialComments);
+    } else {
+      // If no initial comments, fetch them
+      fetchComments();
+    }
+  }, [initialComments, postId]);
 
   const fetchComments = async () => {
+    if (!postId) return;
+
     try {
       setIsLoading(true);
       const fetchedComments = await postService.getComments(postId);
-      setComments(fetchedComments);
+
+      // Only update state if the component is still mounted
+      if (isMounted.current) {
+        setComments(fetchedComments);
+        console.log('Fetched comments:', fetchedComments);
+      }
     } catch (error) {
       console.error('Failed to fetch comments:', error);
-      toast.error('Failed to load comments');
+      if (isMounted.current) {
+        toast.error('Failed to load comments');
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
+  // Listen for avatar updates
   useEffect(() => {
-    fetchComments();
-  }, [postId]);
+    const handleAvatarUpdate = (event: CustomEvent) => {
+      console.log('CommentSection: Avatar update event received:', event.detail);
+
+      // Force refresh of avatar images
+      setAvatarRefreshKey(Date.now());
+
+      // Also refresh comments to get updated user data
+      fetchComments();
+    };
+
+    window.addEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+    };
+  }, []);
+
+  // Effect to refresh avatar images
+  useEffect(() => {
+    // Update all user avatar images to use the latest avatar
+    const avatarImages = document.querySelectorAll('.user-avatar-img');
+    avatarImages.forEach((img) => {
+      const imgElement = img as HTMLImageElement;
+      if (imgElement.src && !imgElement.src.startsWith('data:')) {
+        const oldSrc = imgElement.src.split('?')[0]; // Remove any existing timestamp
+        imgElement.src = `${oldSrc}?t=${avatarRefreshKey}`;
+      }
+    });
+  }, [avatarRefreshKey, comments]);
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newComment.trim() || isSubmitting) return;
-    
+
     try {
       setIsSubmitting(true);
       await postService.addComment(postId, newComment);
 
+      // Clear the input field
+      setNewComment('');
+
+      // Notify parent component
       if (onCommentAdded) {
         onCommentAdded();
       }
 
-      setNewComment('');
-      await fetchComments(); // Refresh comments
+      // Refresh the comments list
+      await fetchComments();
+
+      // Force refresh of avatars
+      setAvatarRefreshKey(Date.now());
+
       toast.success('Comment added successfully');
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -87,6 +155,47 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
     }
   };
 
+  // Get current user avatar URL with cache busting
+  const getCurrentUserAvatarUrl = () => {
+    if (!userAvatar) return '/api/placeholder/40/40';
+
+    // If it's a data URL, return as is
+    if (userAvatar.startsWith('data:')) return userAvatar;
+
+    // Add cache busting parameter
+    return `${getImageUrl(userAvatar)}?t=${avatarRefreshKey}`;
+  };
+
+  // Get comment author avatar URL with cache busting
+  const getCommentAuthorAvatarUrl = (comment: PostComment) => {
+    // Check if it's the current user
+    if (comment.user._id === userId && userAvatar) {
+      // If current user, use the latest avatar from localStorage
+      return getCurrentUserAvatarUrl();
+    }
+
+    // Otherwise use the avatar from the comment
+    if (!comment.user.avatar) return '/api/placeholder/40/40';
+
+    // If it's a data URL, return as is
+    if (comment.user.avatar.startsWith('data:')) return comment.user.avatar;
+
+    // Add cache busting parameter
+    return `${getImageUrl(comment.user.avatar)}?t=${avatarRefreshKey}`;
+  };
+
+  // Get comment author name
+  const getCommentAuthorName = (comment: PostComment) => {
+    // Check if it's the current user
+    if (comment.user._id === userId && userName) {
+      // If current user, use the latest name from localStorage
+      return userName;
+    }
+
+    // Otherwise use the name from the comment
+    return getUserDisplayName(comment.user);
+  };
+
   return (
     <div className="comment-section">
       <h5 className="mb-4">Comments ({commentCount})</h5>
@@ -103,11 +212,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
               border: '2px solid #fff',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}>
-            <img 
-              src="/api/placeholder/40/40" 
-              alt="Your avatar" 
-              className="w-100 h-100 object-fit-cover" 
-            />
+            <img src={getCurrentUserAvatarUrl()} alt="Your avatar" className="w-100 h-100 object-fit-cover user-avatar-img" />
           </div>
 
           {/* Input field */}
@@ -138,11 +243,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
                 transition: 'color 0.2s ease',
               }}
               disabled={isSubmitting || !newComment.trim()}>
-              {isSubmitting ? (
-                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-              ) : (
-                <i className="bi bi-send-fill"></i>
-              )}
+              {isSubmitting ? <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> : <i className="bi bi-send-fill"></i>}
             </button>
           </div>
         </div>
@@ -168,7 +269,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
             paddingRight: '5px',
           }}>
           {comments.map((comment, index) => (
-            <div key={comment._id || index} className="d-flex gap-3 mb-4">
+            <div key={comment._id || `comment-${index}-${avatarRefreshKey}`} className="d-flex gap-3 mb-4">
               <div
                 className="rounded-circle overflow-hidden flex-shrink-0"
                 style={{
@@ -177,11 +278,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
                   border: '2px solid #fff',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 }}>
-                <img
-                  src={comment.user.avatar ? getImageUrl(comment.user.avatar) : '/api/placeholder/40/40'}
-                  alt={`${getUserDisplayName(comment.user)}'s avatar`}
-                  className="w-100 h-100 object-fit-cover"
-                />
+                <img src={getCommentAuthorAvatarUrl(comment)} alt={`${getCommentAuthorName(comment)}'s avatar`} className="w-100 h-100 object-fit-cover user-avatar-img" />
               </div>
 
               <div className="flex-grow-1">
@@ -192,7 +289,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}>
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="fw-semibold">{getUserDisplayName(comment.user)}</span>
+                    <span className="fw-semibold">{getCommentAuthorName(comment)}</span>
                     <small className="text-muted">{formatDate(comment.createdAt.toString())}</small>
                   </div>
                   <p className="mb-0">{comment.text}</p>
