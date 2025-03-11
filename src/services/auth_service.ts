@@ -1,6 +1,5 @@
 // src/services/auth_service.ts
 import apiClient from './api-client';
-import axios from 'axios';
 
 export interface SocialLoginCredentials {
   provider: 'google';
@@ -72,35 +71,15 @@ class AuthService {
     }
   }
 
-  // Check if a user with given email exists
-  async checkIfUserExists(email: string): Promise<CheckUserResponse> {
+  async checkIfUserExists(email: string): Promise<{ exists: boolean; userId?: string }> {
     try {
-      // Check if the endpoint exists, if not, consider a fallback approach
-      const response = await apiClient.post<CheckUserResponse>('/auth/check-user', { email });
+      // Use the dedicated endpoint
+      const response = await apiClient.post('/auth/check-user', { email });
       return response.data;
     } catch (error) {
       console.error('Error checking if user exists:', error);
-
-      // FALLBACK: If the endpoint doesn't exist, we can try to check if the
-      // user exists by trying to log in with a dummy password and checking
-      // for a specific error message
-      try {
-        // Try to get user info by email directly if that endpoint exists
-        await apiClient.get(`/auth/user-by-email/${email}`);
-        // If we get here, the user exists
-        return { exists: true };
-      } catch (innerError: unknown) {
-        // Check the error response
-        if (axios.isAxiosError(innerError) && innerError.response?.status === 404) {
-          // 404 means user not found
-          return { exists: false };
-        } else if (axios.isAxiosError(innerError) && (innerError.response?.status === 400 || innerError.response?.status === 401)) {
-          // 400 or 401 likely means the user exists but credentials are wrong
-          return { exists: true };
-        }
-        // For any other error, assume user doesn't exist
-        return { exists: false };
-      }
+      // Default to false if there's an error
+      return { exists: false };
     }
   }
 
