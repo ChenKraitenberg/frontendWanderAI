@@ -170,6 +170,7 @@ const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({ currentImag
     if (!e.target.files || e.target.files.length === 0) return;
 
     const file = e.target.files[0];
+    let imageUrl = '';
 
     try {
       setUploading(true);
@@ -177,9 +178,28 @@ const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({ currentImag
 
       // Upload the image using the file upload service
       const uploadResponse = await userService.uploadProfileImage(file);
-      const imageUrl = uploadResponse.url;
+      imageUrl = uploadResponse.url;
 
       console.log('Successfully uploaded image:', imageUrl);
+
+      // Add this in handleImageChange in ProfileImageUploader.tsx after successful upload
+      // Store both in localStorage
+      localStorage.setItem('userAvatar', imageUrl);
+      localStorage.setItem('userAvatarTimestamp', Date.now().toString());
+
+      // After updating all posts, manually trigger a refresh of key elements
+      document.querySelectorAll('img.user-avatar-img').forEach((img) => {
+        // Force image refresh by updating the src
+        const imgElement = img as HTMLImageElement;
+        if (imgElement.src && !imgElement.src.startsWith('data:')) {
+          imgElement.src = `${imgElement.src.split('?')[0]}?t=${Date.now()}`;
+        }
+      });
+
+      // As a last resort, refresh after a delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
 
       // Make sure we have a valid user ID
       if (!userId) {
@@ -222,6 +242,23 @@ const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({ currentImag
     } finally {
       setUploading(false);
     }
+
+    window.dispatchEvent(
+      new CustomEvent('avatar-updated', {
+        detail: {
+          userId,
+          avatar: imageUrl,
+          timestamp: Date.now(),
+        },
+      })
+    );
+
+    // Add a small timeout then reload the page to ensure everything is updated
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+
+    toast.success('Profile picture updated successfully! Refreshing page...');
   };
 
   // Get the display URL for the current image

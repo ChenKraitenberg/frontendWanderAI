@@ -153,32 +153,61 @@ export const getUserDisplayName = (user: { name?: string; email?: string } | nul
  * @param userObj User object that might contain avatar information
  * @returns A valid URL for the user's avatar image
  */
-export const getUserAvatar = (userObj?: { _id?: string; avatar?: string | null }): string => {
-  // For debugging
-  console.log('getUserAvatar called for user:', {
-    providedUserId: userObj?._id,
-    currentUserId: localStorage.getItem('userId'),
-    hasAvatar: !!userObj?.avatar,
-  });
+// export const getUserAvatar = (userObj?: { _id?: string; avatar?: string | null }): string => {
+//   // For debugging
+//   console.log('getUserAvatar called for user:', {
+//     providedUserId: userObj?._id,
+//     currentUserId: localStorage.getItem('userId'),
+//     hasAvatar: !!userObj?.avatar,
+//   });
 
-  // If this is the current user, check localStorage first
+//   // If this is the current user, check localStorage first
+//   const currentUserId = localStorage.getItem('userId');
+//   if (userObj?._id === currentUserId) {
+//     const localAvatar = localStorage.getItem('userAvatar');
+//     if (localAvatar) {
+//       return localAvatar;
+//     }
+//   }
+
+//   // Otherwise, use the provided avatar if it exists
+//   if (userObj?.avatar) {
+//     return getImageUrl(userObj.avatar);
+//   }
+
+//   // Default avatar as fallback
+//   return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
+// };
+export const getUserAvatar = (userObj?: { _id?: string; avatar?: string | null }): string => {
+  // Check if this is the current user and use localStorage if available
   const currentUserId = localStorage.getItem('userId');
   if (userObj?._id === currentUserId) {
     const localAvatar = localStorage.getItem('userAvatar');
     if (localAvatar) {
-      return localAvatar;
+      // For data URLs, return as-is
+      if (localAvatar.startsWith('data:')) {
+        return localAvatar;
+      }
+      // For regular URLs, add cache busting
+      const cacheBuster = Date.now();
+      return `${getImageUrl(localAvatar)}?t=${cacheBuster}`;
     }
   }
 
-  // Otherwise, use the provided avatar if it exists
+  // For the provided avatar, use getImageUrl with cache busting only for non-data URLs
   if (userObj?.avatar) {
-    return getImageUrl(userObj.avatar);
+    // For data URLs, return as-is
+    if (userObj.avatar.startsWith('data:')) {
+      return userObj.avatar;
+    }
+    // For regular URLs, add cache busting
+    const cacheBuster = Date.now();
+    return `${getImageUrl(userObj.avatar)}?t=${cacheBuster}`;
   }
 
-  // Default avatar as fallback
+  // Default avatar
   return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
 };
-
 /**
  * Gets a user's initials based on their name
  * Useful for avatar placeholders
