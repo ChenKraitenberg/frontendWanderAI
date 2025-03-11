@@ -51,6 +51,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
   const [isDeleting, setIsDeleting] = useState(false);
   const [postLikes, setPostLikes] = useState<string[]>(post.likes || []);
   const [currentPost, setCurrentPost] = useState<Post>(post);
+  const [refreshTrigger, setRefreshTrigger] = useState(Date.now());
 
   // Fetch fresh post data on mount to ensure likes are up to date
   useEffect(() => {
@@ -71,6 +72,18 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     refreshPostData();
   }, [post._id, post]);
 
+  useEffect(() => {
+    const handleAvatarUpdate = (event: CustomEvent) => {
+      console.log('Avatar update event received:', event.detail);
+      setRefreshTrigger(Date.now());
+    };
+
+    window.addEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('user-avatar-updated', handleAvatarUpdate as EventListener);
+    };
+  }, []);
   // Update local state when post prop changes
   useEffect(() => {
     setCurrentPost(post);
@@ -150,50 +163,95 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     }
   };
 
+
+  if (post.image) debugImagePath(post.image, 'PostCard');
+
+  const getUserAvatar = (user?: { _id: string; email: string; name?: string; avatar?: string }): string => {
+    // Add a unique timestamp to avoid browser caching
+    const timestamp = new Date().getTime();
+
+    // If the user is the current logged-in user, use potentially updated avatar from localStorage
+    if (user?._id === userId) {
+      const currentUserAvatar = localStorage.getItem('userAvatar');
+      if (currentUserAvatar) {
+        // Don't add timestamp to data URLs
+        if (currentUserAvatar.startsWith('data:')) {
+          return currentUserAvatar;
+        }
+        return `${getImageUrl(currentUserAvatar)}?nocache=${timestamp}`;
+      }
+    }
+
+    // If user has an avatar, use it
+    if (user?.avatar) {
+      // Don't add timestamp to data URLs
+      if (user.avatar.startsWith('data:')) {
+        return user.avatar;
+      }
+      return `${getImageUrl(user.avatar)}?nocache=${timestamp}`;
+    }
+
+    // Default avatar if nothing else is available
+    return '/assets/default-avatar.png';
+  };
+
+  const getUserDisplayName = (user?: { name?: string; email?: string }): string => {
+    return user?.name || user?.email || 'Anonymous';
+  };
+
+  // Add this just before the return statement in PostCard.tsx
+  // In PostCard.tsx, modify the useEffect for avatar updates
+  useEffect(() => {
+    // Only check once, no interval (to avoid excessive rendering)
+    const checkForAvatarUpdates = () => {
+      const lastUpdateTime = localStorage.getItem('userAvatarTimestamp');
+
+      // Only update if there's been a change since component mounted
+      if (lastUpdateTime && parseInt(lastUpdateTime) > initialRenderTime) {
+        // Just update the avatar, not the entire post data
+        if (post.user?._id === userId) {
+          // Create a shallow copy to trigger re-render, but preserve all data
+          const updatedUser = { ...post.user };
+
+          // No need to modify the avatar here, the getUserAvatar function will handle it
+          setCurrentPost((prev) => ({
+            ...prev,
+            user: updatedUser,
+          }));
+        }
+      }
+    };
+
+    // Store the time this component initially rendered
+    const initialRenderTime = Date.now();
+
+    // Check only once after a short delay (to allow for profile update to complete)
+    const timeoutId = setTimeout(checkForAvatarUpdates, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [userId, post.user?._id]);
+
+    
   const displayTitle = currentPost.name || currentPost.title;
   /*const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };*/
-  if (post.image) debugImagePath(post.image, 'PostCard');
 
 
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
         {/* Post Image */}
-        <div
-          className="card-img-top"
-          style={{
-            height: '180px',
-            backgroundImage: currentPost.image ? `url(${getImageUrl(currentPost.image)})` : 'url(/api/placeholder/800/400)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            borderTopLeftRadius: '1rem',
-            borderTopRightRadius: '1rem',
-            cursor: 'pointer',
-          }}
-          onClick={() => navigate(`/post/${currentPost._id}`)}
-          // Uncomment this line for debugging:
-          // ref={() => currentPost.image && debugImagePath(currentPost.image, 'PostCard')}
-        />
-        {/* User Info Header */}
+        <img src={post.image ? getImageUrl(post.image) : '/assets/placeholder-image.jpg'} alt={post.title} className="card-img-top rounded-top" style={{ objectFit: 'cover', height: '200px' }} />
+
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img
-              src={currentPost.user?.avatar ? getImageUrl(currentPost.user.avatar) : '/api/placeholder/45/45'}
-              alt={currentPost.user?.name || 'User'}
-              className="rounded-circle"
-              width="45"
-              height="45"
-              // Uncomment this line for debugging:
-              // onLoad={() => currentPost.user?.avatar && debugImagePath(currentPost.user.avatar, 'PostCard-Avatar')}
-            />
+            <img src={getUserAvatar(post.user)} alt={getUserDisplayName(post.user)} className="rounded-circle user-avatar-img" width="45" height="45" style={{ objectFit: 'cover' }} />
           </div>
           <div>
-            <h6 className="mb-0 fw-bold">{currentPost.user?.name || currentPost.user?.email || 'Anonymous'}</h6>
-            <small className="text-muted">{formatRelativeTime(currentPost.createdAt)}</small>
+            <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
+            <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
           </div>
-
           {/* Direct action buttons instead of dropdown */}
           {(isOwner || showActions) && (
             <div className="ms-auto">

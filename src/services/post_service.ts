@@ -118,8 +118,6 @@ class PostService {
     }
   };
 
-  // Update an existing post - using delete and recreate approach
-  // since the server doesn't have a direct update endpoint
   async updatePost(id: string, postData: UpdatePostData) {
     console.log(`Updating post ${id} with data:`, postData);
     try {
@@ -140,13 +138,14 @@ class PostService {
         maxSeats: postData.maxSeats ?? currentPost.maxSeats,
         bookedSeats: postData.bookedSeats ?? currentPost.bookedSeats,
         image: postData.image || currentPost.image,
+        // Preserve the original user info if not explicitly changed
+        user: postData.name || currentPost.user,
         // Preserve the original creation date and likes/comments
         createdAt: currentPost.createdAt,
         likes: currentPost.likes || [],
         comments: currentPost.comments || [],
       };
 
-      // Remove properties that shouldn't be sent to the server
       // Create the new post
       const newPost = await this.createPost(mergedData as CreatePostData);
       console.log('Post updated successfully (recreated):', newPost);
@@ -315,6 +314,234 @@ class PostService {
         console.error('Error fetching paginated posts:', error);
         throw error;
       });
+  }
+
+  async updateUserInfoInAllPosts(userId: string, updatedUserInfo: { name?: string; avatar?: string }) {
+    try {
+      console.log(`Starting to update user info in all posts for user ${userId}:`, updatedUserInfo);
+
+      // First get all posts by this user
+      const userPosts = await this.getByUserId(userId);
+      console.log(`Found ${userPosts.length} posts to update`);
+
+      if (userPosts.length === 0) {
+        console.log('No posts found for this user');
+        return 0;
+      }
+
+      // Keep track of successful updates
+      let updatedCount = 0;
+
+      // Update each post one by one
+      for (const post of userPosts) {
+        try {
+          console.log(`Updating post ${post._id}`);
+
+          // Get the current post to make sure we have the latest version
+          const currentPost = await this.getPostById(post._id);
+
+          // IMPORTANT: Preserve existing user information
+          const updatedPost = {
+            ...currentPost,
+            user: {
+              ...currentPost.user, // Preserve all existing user data
+              _id: userId,
+              // Only update the specific fields that were provided
+              ...(updatedUserInfo.name !== undefined ? { name: updatedUserInfo.name } : {}),
+              ...(updatedUserInfo.avatar !== undefined ? { avatar: updatedUserInfo.avatar } : {}),
+            },
+          };
+
+          // Try using our update method
+          await this.updatePost(post._id, {
+            user: updatedPost.user,
+          });
+
+          console.log(`Post ${post._id} updated via updatePost`);
+          updatedCount++;
+        } catch (postError) {
+          console.error(`Failed to update post ${post._id}:`, postError);
+        }
+      }
+
+      console.log(`Updated ${updatedCount} of ${userPosts.length} posts with new user info`);
+      return updatedCount;
+    } catch (error) {
+      console.error('Error updating user info in posts:', error);
+      throw error;
+    }
+  }
+
+  // Add to post_service.ts
+  async testUpdatePostUserInfo(postId: string, updatedUserInfo: { name?: string; avatar?: string }) {
+    console.log(`Test updating post ${postId} with user info:`, updatedUserInfo);
+
+    try {
+      // First get the post
+      const post = await this.getPostById(postId);
+      console.log('Original post user info:', post.user);
+
+      // Create updated post data
+      const updatedPost = {
+        ...post,
+        user: {
+          ...post.user,
+          name: updatedUserInfo.name || post.user?.name,
+          avatar: updatedUserInfo.avatar || post.user?.avatar,
+        },
+      };
+
+      console.log('Sending updated post data:', updatedPost);
+
+      // Update the post
+      const result = await apiClient.put(`/posts/${postId}`, updatedPost);
+      console.log('Update result:', result.data);
+
+      return result.data;
+    } catch (error) {
+      console.error('Test update failed:', error);
+      throw error;
+    }
+  }
+
+  // async updatePostWithNewUserInfo(postId: string, newUserInfo: { name?: string; avatar?: string }) {
+  //   // Step 1: Get the current post
+  //   const post = await this.getPostById(postId);
+
+  //   // Step 2: Delete the current post
+  //   await this.deletePost(postId);
+
+  //   // Step 3: Merge the updated user info
+  //   const updatedUserInfo = {
+  //     ...post.user,
+  //     name: newUserInfo.name || post.user?.name,
+  //     avatar: newUserInfo.avatar || post.user?.avatar,
+  //   };
+
+  //   // Step 4: Create a new post with updated info
+  //   const newPostData = {
+  //     ...post,
+  //     user: updatedUserInfo,
+  //     // Make sure these are properly formatted for creating a new post
+  //     startDate: post.startDate ? new Date(post.startDate).toISOString() : new Date().toISOString(),
+  //     endDate: post.endDate ? new Date(post.endDate).toISOString() : new Date().toISOString(),
+  //   };
+
+  //   // Step 5: Create the new post - use the post's title as name or fallback to user's name
+  //   const createPostData: CreatePostData = {
+  //     name: post.title || updatedUserInfo.name || '',
+  //     description: post.description,
+  //     startDate: newPostData.startDate,
+  //     endDate: newPostData.endDate,
+  //     price: post.price || 0,
+  //     maxSeats: post.maxSeats || 0,
+  //     bookedSeats: post.bookedSeats || 0,
+  //     image: post.image || '',
+  //   };
+
+  //   return await this.createPost(createPostData);
+  // }
+
+  async updatePostWithNewUserInfo(postId: string, newUserInfo: { name?: string; avatar?: string }) {
+    // Step 1: Get the current post
+    const post = await this.getPostById(postId);
+    console.log('Current post before update:', post);
+
+    // Step 2: Delete the current post
+    await this.deletePost(postId);
+
+    // Step 3: Merge the updated user info
+    // IMPORTANT: Explicit handling for avatar - make sure we're using the new value
+    const updatedUserInfo = {
+      ...post.user,
+      name: newUserInfo.name !== undefined ? newUserInfo.name : post.user?.name,
+      // Explicitly check for avatar updates and use the new value
+      avatar: newUserInfo.avatar !== undefined ? newUserInfo.avatar : post.user?.avatar,
+    };
+
+    console.log('Updated user info for post:', updatedUserInfo);
+
+    // Step 4: Create a new post with updated info
+    const newPostData = {
+      ...post,
+      user: updatedUserInfo,
+      // Make sure these are properly formatted for creating a new post
+      startDate: post.startDate ? new Date(post.startDate).toISOString() : new Date().toISOString(),
+      endDate: post.endDate ? new Date(post.endDate).toISOString() : new Date().toISOString(),
+    };
+
+    console.log('New post data being created:', newPostData);
+
+    // Step 5: Create the new post - transform to match CreatePostData interface
+    const createPostData: CreatePostData = {
+      name: post.title || updatedUserInfo.name || '',
+      description: post.description,
+      startDate: newPostData.startDate,
+      endDate: newPostData.endDate,
+      price: post.price || 0,
+      maxSeats: post.maxSeats || 0,
+      bookedSeats: post.bookedSeats || 0,
+      image: post.image || '',
+    };
+
+    const newPost = await this.createPost(createPostData);
+    console.log('New post created with updated avatar:', newPost);
+    return newPost;
+  }
+
+  // Add this function to src/services/post_service.ts
+  async updateUserAvatarInPosts(userId: string, newAvatar: string) {
+    console.log(`Updating avatar to ${newAvatar} in all posts for user ${userId}`);
+
+    try {
+      // Get all posts by this user
+      const posts = await this.getByUserId(userId);
+      console.log(`Found ${posts.length} posts to update`);
+
+      // Track successes and failures
+      let successCount = 0;
+      let failCount = 0;
+
+      // Process each post individually
+      for (const post of posts) {
+        try {
+          console.log(`Updating post ${post._id} with new avatar`);
+
+          // Skip if post has no user object or is already updated
+          if (!post.user) {
+            console.log(`Skipping post ${post._id} - no user info`);
+            continue;
+          }
+
+          if (post.user.avatar === newAvatar) {
+            console.log(`Skipping post ${post._id} - avatar already updated`);
+            continue;
+          }
+
+          // Create updated post data with new avatar
+          const updatedPost = {
+            ...post,
+            user: {
+              ...post.user,
+              avatar: newAvatar,
+            },
+          };
+
+          // Update the post
+          await this.updatePost(post._id, updatedPost);
+          successCount++;
+        } catch (postError) {
+          console.error(`Error updating post ${post._id}:`, postError);
+          failCount++;
+        }
+      }
+
+      console.log(`Updated ${successCount} posts with new avatar (${failCount} failed)`);
+      return true;
+    } catch (error) {
+      console.error('Error updating posts with new avatar:', error);
+      return false;
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import ProfileImageUploader from './ProfileImageUploader';
 import { useAuth } from '../context/AuthContext';
+import postService from '../services/post_service';
 
 interface ProfileEditProps {
   user: {
@@ -26,6 +27,7 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
     setAvatarUrl(newImageUrl);
   };
 
+  // In ProfileEdit.tsx - handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -34,20 +36,36 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
     try {
       setIsSubmitting(true);
 
+      // First update the profile itself
       const updatedData = {
         name: name.trim(),
+        avatar: avatarUrl || undefined,
       };
 
       // Use the updateUserProfile function from AuthContext
       await updateUserProfile(updatedData);
 
-      // Notify parent component of changes
-      onUpdate({
-        name: name.trim(),
-        avatar: avatarUrl || undefined,
-      });
+      // Now explicitly update all posts
+      try {
+        const userId = user._id;
+        if (userId) {
+          toast.info('Updating your posts with new profile information...');
 
-      toast.success('Profile updated successfully');
+          // Call our new function directly
+          const updatedCount = await postService.updateUserInfoInAllPosts(userId, {
+            name: name.trim(),
+            avatar: avatarUrl || undefined,
+          });
+
+          toast.success(`Successfully updated ${updatedCount} posts with your new profile information`);
+        }
+      } catch (postsError) {
+        console.error('Error updating posts:', postsError);
+        toast.warning('Your profile was updated, but there was an issue updating your posts');
+      }
+
+      // Notify parent component of changes
+      onUpdate(updatedData);
     } catch (error) {
       console.error('Failed to update profile:', error);
       toast.error('Failed to update profile. Please try again.');
