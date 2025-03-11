@@ -14,6 +14,11 @@ interface GoogleCredentialResponse {
   credential: string;
 }
 
+interface SocialLoginButtonsProps {
+  onLoginStart?: (email: string) => Promise<boolean>;
+  showUsernamePrompt?: boolean;
+}
+
 interface GoogleButtonOptions {
   theme: string;
   size: string;
@@ -47,7 +52,7 @@ declare global {
   }
 }
 
-const SocialLoginButtons: React.FC = () => {
+const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onLoginStart, showUsernamePrompt }) => {
   const { socialLogin } = useAuth();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
@@ -108,61 +113,7 @@ const SocialLoginButtons: React.FC = () => {
     };
   }, []);
 
-  // Handle Google sign-in
-  const handleGoogleSignIn = async (response: GoogleCredentialResponse) => {
-    try {
-      setLoadingGoogle(true);
-      const { credential } = response;
-
-      if (!credential) {
-        throw new Error('Google authentication failed');
-      }
-
-      // Parse JWT to get user info
-      const tokenParts = credential.split('.');
-      const payload: GooglePayload = JSON.parse(atob(tokenParts[1]));
-
-      // Log email for debugging purposes
-      console.log(`Google login with email: ${payload.email}`);
-
-      // Store social login data to use after username is provided
-      const socialData: SocialData = {
-        provider: 'google',
-        token: credential,
-        email: payload.email,
-        name: payload.name,
-        avatar: payload.picture,
-      };
-
-      // Skip username prompt if email already exists in the system
-      try {
-        // Complete the social login process immediately
-        await socialLogin(socialData);
-        toast.success('Logged in with Google!');
-        // Reset states
-        setPendingSocialData(null);
-        setUsername('');
-        setUsernameError(null);
-      } catch (error: unknown) {
-        if (isErrorWithResponse(error) && error.response.data?.message === 'Username is required') {
-          setPendingSocialData(socialData);
-          setShowUsernameModal(true);
-        } else if (isErrorWithResponse(error)) {
-          console.error('Google sign-in error:', error);
-          toast.error('Login failed: ' + (error.response.data?.message || 'An error occurred'));
-        } else {
-          console.error('Google sign-in error:', error);
-          toast.error('Login failed: An error occurred');
-        }
-      }
-    } catch (error: unknown) {
-      console.error('Google sign-in error:', error);
-      toast.error('Google sign-in failed');
-    } finally {
-      setLoadingGoogle(false);
-    }
-  };
-
+  // First implementation of handleGoogleSignIn removed as it's superseded by the more comprehensive version below
   // Handle username submission
   const handleUsernameSubmit = async () => {
     // Validate username
@@ -209,6 +160,157 @@ const SocialLoginButtons: React.FC = () => {
         console.error('Social login error:', error);
       }
       toast.error('Login failed, please try again');
+    } finally {
+      setLoadingGoogle(false);
+    }
+  };
+
+  const isOnRegistrationPage = () => {
+    return window.location.pathname.includes('register');
+  };
+
+  // Then replace your handleGoogleSignIn function with this implementation
+  const handleGoogleSignIn = async (response: GoogleCredentialResponse) => {
+    try {
+      setLoadingGoogle(true);
+      const { credential } = response;
+
+      if (!credential) {
+        throw new Error('Google authentication failed');
+      }
+
+      // Parse JWT to get user info
+      const tokenParts = credential.split('.');
+      const payload: GooglePayload = JSON.parse(atob(tokenParts[1]));
+
+      // If onLoginStart prop is provided, call it
+      if (onLoginStart && payload.email) {
+        try {
+          const userExists = await onLoginStart(payload.email);
+
+          // Different behavior based on whether user exists
+          if (userExists) {
+            // Handle existing user
+          } else if (showUsernamePrompt) {
+            // Show username modal for new users
+            setPendingSocialData({
+              provider: 'google',
+              token: credential,
+              email: payload.email,
+              name: payload.name,
+              avatar: payload.picture,
+            });
+            setShowUsernameModal(true);
+          }
+        } catch (error) {
+          console.error('Error checking user existence:', error);
+        }
+      }
+
+      console.log(`Google auth with email: ${payload.email}`);
+
+      // Check if we're on registration page
+      const onRegistrationPage = isOnRegistrationPage();
+      console.log(`Current page is registration page: ${onRegistrationPage}`);
+
+      try {
+        // Explicitly check if the user exists
+        const checkResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3060'}/auth/check-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: payload.email }),
+        });
+
+        const userCheckData = await checkResponse.json();
+        const userExists = userCheckData.exists;
+
+        console.log(`User exists check: ${userExists}`);
+
+        if (userExists && onRegistrationPage) {
+          // We're on registration but user already exists
+          console.log('User already exists and we are on registration page');
+          toast.error('An account with this email already exists. Please log in instead.');
+          setLoadingGoogle(false);
+          return;
+        }
+
+        if (!userExists && !onRegistrationPage) {
+          // We're on login but no account exists
+          console.log('User does not exist and we are on login page');
+          toast.error('No account exists with this email. Please register first.');
+          setLoadingGoogle(false);
+          return;
+        }
+
+        // Create the socialData object
+        const socialData: SocialLoginCredentials = {
+          provider: 'google',
+          token: credential,
+          email: payload.email,
+          name: payload.name,
+          avatar: payload.picture,
+        };
+
+        if (!userExists) {
+          // New user registration - show username dialog
+          console.log('New user - showing username dialog');
+          // Ensure email is not undefined for SocialData type requirement
+          setPendingSocialData({
+            ...socialData,
+            email: payload.email || '',
+            name: payload.name || '',
+          });
+          setShowUsernameModal(true);
+          setUsername(payload.name);
+        } else {
+          // Existing user login - proceed directly
+          console.log('Existing user - proceeding with login');
+          await socialLogin(socialData);
+          toast.success('Logged in with Google!');
+        }
+      } catch (error) {
+        console.error('Error in user existence check:', error);
+
+        // Fallback behavior - try to proceed with login/registration
+        // and let the server handle it
+        try {
+          const socialData: SocialLoginCredentials = {
+            provider: 'google',
+            token: credential,
+            email: payload.email,
+            name: payload.name,
+            avatar: payload.picture,
+          };
+
+          // If server returns "username required" we know it's a new user
+          await socialLogin(socialData);
+          toast.success('Authentication successful!');
+        } catch (socialError: unknown) {
+          console.error('Social login error:', socialError);
+
+          if (isErrorWithResponse(socialError) && socialError.response.data?.message === 'Username is required') {
+            // This is a new user, show username dialog
+            // Make sure email is defined to satisfy SocialData type requirements
+            const socialData: SocialData = {
+              provider: 'google',
+              token: credential,
+              email: payload.email || '', // Ensure email is never undefined
+              name: payload.name || '', // Ensure name is never undefined
+              avatar: payload.picture,
+            };
+            setPendingSocialData(socialData);
+            setShowUsernameModal(true);
+          } else {
+            // Some other error
+            toast.error('Authentication failed. Please try again.');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      toast.error('Google sign-in failed. Please try again later.');
     } finally {
       setLoadingGoogle(false);
     }

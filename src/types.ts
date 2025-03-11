@@ -67,7 +67,6 @@ export interface GeneratedPost {
   createdAt?: Date;
   updatedAt?: Date;
   preferences?: PostPreferences;
-  
 }
 
 export interface SavedPost {
