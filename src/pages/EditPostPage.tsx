@@ -122,6 +122,8 @@ const EditPostPage: React.FC = () => {
         image: updatedImageUrl,
         startDate: (formData.startDate as string) || '',
         endDate: (formData.endDate as string) || '',
+        // Omit comments to prevent type conflicts
+        comments: undefined,
       };
 
       console.log('Updating post with data:', updatedPostData);

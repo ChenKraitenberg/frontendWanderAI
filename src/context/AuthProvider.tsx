@@ -270,6 +270,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       if (userData.avatar) {
         localStorage.setItem('userAvatar', userData.avatar);
+        localStorage.setItem('userAvatarTimestamp', Date.now().toString()); // Add this line
       }
 
       // 3. Update the user state
@@ -278,59 +279,33 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { ...prev, ...userData };
       });
 
-      // 4. Now update all posts by this user
+      // 4. Now update all posts AND comments by this user
       const userId = localStorage.getItem('userId');
       if (userId) {
         try {
-          console.log('Updating user information in all posts...');
+          console.log('Updating user information in all posts and comments...');
 
-          // Get all user's posts
-          const userPosts = await postService.getByUserId(userId);
+          // Update all user posts with the new profile info
+          await postService.updateUserInfoInAllPosts(userId, userData);
 
-          // For each post, update the user information
-          for (const post of userPosts) {
-            // Update comments where the user is the author
-            if (post.comments && post.comments.length > 0) {
-              // Define interfaces for the comment structure
-              interface CommentUser {
-                _id: string;
-                name: string;
-                avatar: string;
-              }
+          // Additionally, update all comments made by this user in any post
+          await postService.updateUserInfoInAllComments(userId, userData);
 
-              interface Comment {
-                user: CommentUser;
-                [key: string]: unknown; // For other comment properties
-              }
+          console.log('Successfully updated user info in posts and comments');
 
-              const updatedComments: Comment[] = post.comments.map((comment: Comment) => {
-                if (comment.user && comment.user._id === userId) {
-                  return {
-                    ...comment,
-                    user: {
-                      ...comment.user,
-                      name: userData.name || comment.user.name,
-                      avatar: userData.avatar || comment.user.avatar,
-                    },
-                  };
-                }
-                return comment;
-              });
-
-              // If any comments were updated, update the post
-              if (JSON.stringify(updatedComments) !== JSON.stringify(post.comments)) {
-                await postService.updatePost(post._id, {
-                  ...post,
-                  comments: updatedComments,
-                });
-                console.log(`Updated user info in comments for post ${post._id}`);
-              }
-            }
-          }
-
-          console.log('All posts updated successfully');
+          // Dispatch a custom event to notify components about the avatar update
+          window.dispatchEvent(
+            new CustomEvent('user-avatar-updated', {
+              detail: {
+                userId,
+                avatar: userData.avatar,
+                name: userData.name,
+                timestamp: Date.now(),
+              },
+            })
+          );
         } catch (updateError) {
-          console.error('Error updating posts with new user info:', updateError);
+          console.error('Error updating posts/comments with new user info:', updateError);
           // Don't throw error here - we still want profile update to succeed
         }
       }

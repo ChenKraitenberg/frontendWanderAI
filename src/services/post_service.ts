@@ -2,6 +2,17 @@
 import apiClient from './api-client';
 import { Post } from '../types';
 
+// Define the PostComment interface that we're using
+interface PostComment {
+  text: string;
+  user: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  createdAt?: string;
+}
+
 // Define a CreatePostData interface that matches what we're sending to the server
 interface CreatePostData {
   name: string;
@@ -14,6 +25,17 @@ interface CreatePostData {
   image: string;
 }
 
+// Define a Comment interface for strongly typed comments
+interface Comment {
+  text: string;
+  user: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  createdAt?: string;
+}
+
 // Define an UpdatePostData interface for updating posts
 interface UpdatePostData {
   name?: string;
@@ -24,6 +46,7 @@ interface UpdatePostData {
   maxSeats?: number;
   bookedSeats?: number;
   image?: string;
+  comments?: Comment[];
 }
 
 class PostService {
@@ -316,59 +339,161 @@ class PostService {
       });
   }
 
-  async updateUserInfoInAllPosts(userId: string, updatedUserInfo: { name?: string; avatar?: string }) {
+  async updateUserInfoInAllComments(userId: string, updatedUserInfo: { name?: string; avatar?: string }): Promise<number> {
     try {
-      console.log(`Starting to update user info in all posts for user ${userId}:`, updatedUserInfo);
+      console.log(`Starting to update user info in comments for user ${userId}:`, updatedUserInfo);
 
-      // First get all posts by this user
-      const userPosts = await this.getByUserId(userId);
-      console.log(`Found ${userPosts.length} posts to update`);
+      // Get all posts to check for comments by this user
+      const allPosts = await this.getPosts();
+      console.log(`Found ${allPosts.length} posts to check for comments`);
 
-      if (userPosts.length === 0) {
-        console.log('No posts found for this user');
-        return 0;
-      }
+      let postsUpdated = 0;
+      let commentsUpdated = 0;
 
-      // Keep track of successful updates
-      let updatedCount = 0;
+      // Process each post
+      for (const post of allPosts) {
+        // Skip posts with no comments
+        if (!post.comments || post.comments.length === 0) continue;
 
-      // Update each post one by one
-      for (const post of userPosts) {
-        try {
-          console.log(`Updating post ${post._id}`);
+        let postNeedsUpdate = false;
+        const updatedComments = [...post.comments]; // Create a copy to modify
 
-          // Get the current post to make sure we have the latest version
-          const currentPost = await this.getPostById(post._id);
+        // Check all comments in this post
+        for (let i = 0; i < updatedComments.length; i++) {
+          const comment = updatedComments[i];
 
-          // IMPORTANT: Preserve existing user information
-          const updatedPost = {
-            ...currentPost,
-            user: {
-              ...currentPost.user, // Preserve all existing user data
-              _id: userId,
-              // Only update the specific fields that were provided
-              ...(updatedUserInfo.name !== undefined ? { name: updatedUserInfo.name } : {}),
-              ...(updatedUserInfo.avatar !== undefined ? { avatar: updatedUserInfo.avatar } : {}),
-            },
-          };
+          // If this comment is by the user we're updating
+          if (comment.user && comment.user._id === userId) {
+            console.log(`Found comment by user ${userId} in post ${post._id}`);
 
-          // Try using our update method
-          await this.updatePost(post._id, {
-            user: updatedPost.user,
-          });
+            // Update the user info in this comment
+            updatedComments[i] = {
+              ...comment,
+              user: {
+                ...comment.user,
+                // Only update fields that were provided
+                ...(updatedUserInfo.name !== undefined ? { name: updatedUserInfo.name } : {}),
+                ...(updatedUserInfo.avatar !== undefined ? { avatar: updatedUserInfo.avatar } : {}),
+              },
+            };
 
-          console.log(`Post ${post._id} updated via updatePost`);
-          updatedCount++;
-        } catch (postError) {
-          console.error(`Failed to update post ${post._id}:`, postError);
+            postNeedsUpdate = true;
+            commentsUpdated++;
+          }
+        }
+
+        // If any comments were updated, update the post
+        if (postNeedsUpdate) {
+          try {
+            // Make a deep copy of the post to avoid reference issues
+            const postToUpdate = {
+              ...post,
+              comments: updatedComments,
+            };
+
+            // Update the post with the modified comments
+            await this.updatePost(post._id, postToUpdate);
+            postsUpdated++;
+
+            console.log(`Updated comments in post ${post._id}`);
+          } catch (error) {
+            console.error(`Failed to update comments in post ${post._id}:`, error);
+          }
         }
       }
 
-      console.log(`Updated ${updatedCount} of ${userPosts.length} posts with new user info`);
-      return updatedCount;
+      console.log(`Updated ${commentsUpdated} comments across ${postsUpdated} posts`);
+      return postsUpdated;
     } catch (error) {
-      console.error('Error updating user info in posts:', error);
+      console.error('Error updating user info in comments:', error);
       throw error;
+    }
+  }
+  async updateUserInfoEverywhere(userId: string, updatedUserInfo: { name?: string; avatar?: string }): Promise<{ posts: number; comments: number }> {
+    try {
+      console.log(`Starting comprehensive update of user info for user ${userId}:`, updatedUserInfo);
+
+      // Step 1: Update user info in posts
+      console.log('Updating user info in posts...');
+      const postsUpdated = await this.updateUserInfoInAllComments(userId, updatedUserInfo);
+
+      // Step 2: Update user info in comments
+      console.log('Updating user info in comments...');
+      const commentsPostsUpdated = await this.updateUserInfoInAllComments(userId, updatedUserInfo);
+
+      // After updates are complete, dispatch a custom event to notify components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('user-info-updated', {
+            detail: {
+              userId,
+              updates: updatedUserInfo,
+              timestamp: Date.now(),
+            },
+          })
+        );
+      }
+
+      return {
+        posts: postsUpdated,
+        comments: commentsPostsUpdated,
+      };
+    } catch (error) {
+      console.error('Error updating user info everywhere:', error);
+      throw error;
+    }
+  }
+
+  async updatePostComments(postId: string, comments: PostComment[]): Promise<Post> {
+    try {
+      console.log(`Updating comments for post ${postId} with ${comments.length} comments`);
+
+      // Get the current post data to ensure we have the latest version
+      const post = await this.getPostById(postId);
+
+      // Update only the comments array, preserving all other fields
+      // Convert startDate and endDate to strings if they are Date objects
+      const updatedPost: UpdatePostData = {
+        comments,
+        // Handle other fields that might cause type issues
+        startDate: post.startDate instanceof Date ? post.startDate.toISOString() : (post.startDate as string | undefined),
+        endDate: post.endDate instanceof Date ? post.endDate.toISOString() : (post.endDate as string | undefined),
+      };
+
+      // Use the standard update function
+      return await this.updatePost(postId, updatedPost);
+    } catch (error) {
+      console.error(`Error updating comments for post ${postId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Force refresh of all user-related content (posts, comments, etc.)
+   * This is useful after profile updates to ensure consistency
+   */
+  async forceRefreshUserContent(userId: string): Promise<void> {
+    try {
+      console.log(`Forcing refresh of all content for user ${userId}`);
+
+      // Dispatch a custom event to notify components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('force-content-refresh', {
+            detail: {
+              userId,
+              timestamp: Date.now(),
+            },
+          })
+        );
+      }
+
+      // Additionally, we could implement any server-side refresh logic here
+      // For now, we'll rely on the client-side event
+
+      console.log('User content refresh triggered successfully');
+    } catch (error) {
+      console.error('Error forcing content refresh:', error);
     }
   }
 
