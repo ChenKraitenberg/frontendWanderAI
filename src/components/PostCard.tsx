@@ -287,7 +287,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
             <img src={getUserAvatar()} alt={getUserDisplayName()} className="rounded-circle user-avatar-img" width="45" height="45" style={{ objectFit: 'cover' }} />
           </div>
           <div>
-            <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
+            <h6 className="mb-0 fw-bold">{getUserDisplayName()}</h6>
             <small className="text-muted">{formatRelativeTime(currentPost.createdAt)}</small>
           </div>
           {/* Direct action buttons instead of dropdown */}
