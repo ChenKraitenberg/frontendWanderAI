@@ -22,6 +22,7 @@ const PostDetailPage: React.FC = () => {
   const isOwner = userId && post?.userId === userId;
   const [commentCount, setCommentCount] = useState<number>(0);
 
+  
   // Check if showComments state was passed through location
   useEffect(() => {
     console.log('Location state:', location.state);
@@ -108,6 +109,13 @@ const PostDetailPage: React.FC = () => {
     return diffDays;
   };
 
+ // Get the display title - prefer name field if available, fallback to title
+ const getDisplayTitle = () => {
+  if (!post) return '';
+  return post.title;
+};
+
+
   if (loading) {
     return (
       <MainLayout>
@@ -137,6 +145,8 @@ const PostDetailPage: React.FC = () => {
       </MainLayout>
     );
   }
+
+  
 
   return (
     <MainLayout>
@@ -184,7 +194,7 @@ const PostDetailPage: React.FC = () => {
   
                 {/* Title and Category */}
                 <div className="d-flex justify-content-between align-items-start mb-3">
-                  <h1 className="card-title h3 fw-bold">{post.title}</h1>
+                  <h1 className="card-title h3 fw-bold">{getDisplayTitle()}</h1>
                   {post.category && (
                     <span
                       className="badge rounded-pill ms-2"

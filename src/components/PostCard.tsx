@@ -30,6 +30,8 @@ interface Post {
   likes: string[];
   comments: PostComment[];
   category?: 'RELAXED' | 'MODERATE' | 'INTENSIVE';
+  name?: string;
+  destination?: string;
 }
 
 interface PostCardProps {
@@ -81,6 +83,29 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
+  // Format relative time for post creation (e.g., "2 hours ago", "3 days ago")
+  const formatRelativeTime = (date: Date | string) => {
+    const now = new Date();
+    const postDate = new Date(date);
+    const diffTime = Math.abs(now.getTime() - postDate.getTime());
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) {
+      return 'Just now';
+    } else if (diffMinutes < 60) {
+      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    } else {
+      return `Posted on ${formatDate(date)}`;
+    }
+  };
+
+
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
@@ -125,10 +150,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     }
   };
 
+  const displayTitle = currentPost.name || currentPost.title;
   /*const handleCommentClick = (postId: string) => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };*/
   if (post.image) debugImagePath(post.image, 'PostCard');
+
+
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
@@ -163,7 +191,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
           </div>
           <div>
             <h6 className="mb-0 fw-bold">{currentPost.user?.name || currentPost.user?.email || 'Anonymous'}</h6>
-            <small className="text-muted">{formatDate(currentPost.createdAt)}</small>
+            <small className="text-muted">{formatRelativeTime(currentPost.createdAt)}</small>
           </div>
 
           {/* Direct action buttons instead of dropdown */}
@@ -182,8 +210,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
         {/* Post Content */}
         <div className="card-body">
           <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${currentPost._id}`)}>
-            {currentPost.title}
+           {displayTitle}
           </h5>
+
+           {/* Destination display */}
+           {currentPost.destination && (
+            <div className="mb-2">
+              <small className="text-muted d-flex align-items-center">
+                <i className="bi bi-geo-alt me-1"></i>
+                {currentPost.destination}
+              </small>
+            </div>
+          )}
+
           <p
             className="card-text text-muted mb-3"
             style={{
