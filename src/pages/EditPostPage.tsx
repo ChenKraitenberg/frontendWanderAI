@@ -100,7 +100,7 @@ const EditPostPage: React.FC = () => {
       // If a new image was selected, upload it first
       if (selectedImage) {
         const imageFormData = new FormData();
-        imageFormData.append('file', selectedImage);
+        imageFormData.append('image', selectedImage);
 
         console.log('Uploading image for post update...');
 

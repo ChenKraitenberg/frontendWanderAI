@@ -137,7 +137,6 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-
   const fetchWishlistItems = () => {
     try {
       console.log('Fetching wishlist items from localStorage');
@@ -171,19 +170,32 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // Use a single useEffect with the proper dependency
   useEffect(() => {
     const loadData = async () => {
       const userData = await fetchUserData();
       if (userData?._id) {
         await fetchUserPosts(userData._id);
-  
+
         fetchWishlistItems();
       }
     };
 
     loadData();
   }, [fetchUserData]);
+
+  useEffect(() => {
+    // Sync profile data with localStorage
+    const storedAvatar = localStorage.getItem('userAvatar');
+    if (user && storedAvatar && (!user.avatar || user.avatar !== storedAvatar)) {
+      setUser((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          avatar: storedAvatar,
+        };
+      });
+    }
+  }, [user]);
 
   const calculateTotalDays = () => {
     return posts.reduce((total, post) => {
@@ -225,7 +237,7 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleRemoveFromWishlist = (itemId: string) => {
-    setWishlistItems((current) => current.filter(item => item.id !== itemId));
+    setWishlistItems((current) => current.filter((item) => item.id !== itemId));
   };
 
   const handleLikePost = async (postId: string, newLikes: string[]) => {
@@ -345,8 +357,8 @@ const ProfilePage: React.FC = () => {
         <div className="mb-4">
           <ul className="nav nav-pills nav-fill">
             <li className="nav-item">
-              <button 
-                className={`nav-link ${activeTab === 'trips' ? 'active' : ''}`} 
+              <button
+                className={`nav-link ${activeTab === 'trips' ? 'active' : ''}`}
                 onClick={() => setActiveTab('trips')}
                 style={{
                   background: activeTab === 'trips' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
@@ -361,8 +373,8 @@ const ProfilePage: React.FC = () => {
               </button>
             </li>
             <li className="nav-item">
-              <button 
-                className={`nav-link ${activeTab === 'wishlist' ? 'active' : ''}`} 
+              <button
+                className={`nav-link ${activeTab === 'wishlist' ? 'active' : ''}`}
                 onClick={() => setActiveTab('wishlist')}
                 style={{
                   background: activeTab === 'wishlist' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
@@ -378,9 +390,6 @@ const ProfilePage: React.FC = () => {
             </li>
           </ul>
         </div>
-
-
-
 
         {/* Content based on active tab */}
         {activeTab === 'trips' ? (
@@ -447,10 +456,7 @@ const ProfilePage: React.FC = () => {
                 <div className="row g-4">
                   {wishlistItems.map((item) => (
                     <div key={`wishlist-${item.id}`} className="col-md-6 col-lg-4">
-                      <WishlistCard
-                        item={item}
-                        onDelete={handleRemoveFromWishlist}
-                      />
+                      <WishlistCard item={item} onDelete={handleRemoveFromWishlist} />
                     </div>
                   ))}
                 </div>

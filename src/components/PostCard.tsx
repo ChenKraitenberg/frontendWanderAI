@@ -129,37 +129,41 @@ const PostCard: React.FC<PostCardProps> = ({ post, onLike, onCommentClick, onDel
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };*/
   if (post.image) debugImagePath(post.image, 'PostCard');
+
+  const getCurrentUserAvatar = () => {
+    return localStorage.getItem('userUpdatedAvatar') || localStorage.getItem('userAvatar');
+  };
+
+  const getUserAvatar = (user?: { _id: string; email: string; name?: string; avatar?: string }): string => {
+    // If the user is the current logged-in user, use potentially updated avatar from localStorage
+    if (user?._id === userId) {
+      const currentUserAvatar = getCurrentUserAvatar();
+      if (currentUserAvatar) {
+        return getImageUrl(currentUserAvatar);
+      }
+    }
+
+    // If user has an avatar, use it
+    if (user?.avatar) {
+      return getImageUrl(user.avatar);
+    }
+
+    // Default avatar if nothing else is available
+    return '/assets/default-avatar.png';
+  };
+
+  const getUserDisplayName = (user?: { name?: string; email?: string }): string => {
+    return user?.name || user?.email || 'Anonymous';
+  };
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100 post-card">
         {/* Post Image */}
-        <div
-          className="card-img-top"
-          style={{
-            height: '180px',
-            backgroundImage: currentPost.image ? `url(${getImageUrl(currentPost.image)})` : 'url(/api/placeholder/800/400)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            borderTopLeftRadius: '1rem',
-            borderTopRightRadius: '1rem',
-            cursor: 'pointer',
-          }}
-          onClick={() => navigate(`/post/${currentPost._id}`)}
-          // Uncomment this line for debugging:
-          // ref={() => currentPost.image && debugImagePath(currentPost.image, 'PostCard')}
-        />
+        <img src={post.image ? getImageUrl(post.image) : '/assets/placeholder-image.jpg'} alt={post.title} className="card-img-top rounded-top" style={{ objectFit: 'cover', height: '200px' }} />
         {/* User Info Header */}
         <div className="card-header bg-white border-0 d-flex align-items-center">
           <div className="user-avatar me-2">
-            <img
-              src={currentPost.user?.avatar ? getImageUrl(currentPost.user.avatar) : '/api/placeholder/45/45'}
-              alt={currentPost.user?.name || 'User'}
-              className="rounded-circle"
-              width="45"
-              height="45"
-              // Uncomment this line for debugging:
-              // onLoad={() => currentPost.user?.avatar && debugImagePath(currentPost.user.avatar, 'PostCard-Avatar')}
-            />
+            <img src={getUserAvatar(post.user)} alt={getUserDisplayName(post.user)} className="rounded-circle" width="45" height="45" style={{ objectFit: 'cover' }} />
           </div>
           <div>
             <h6 className="mb-0 fw-bold">{currentPost.user?.name || currentPost.user?.email || 'Anonymous'}</h6>
