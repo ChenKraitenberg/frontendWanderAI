@@ -50,28 +50,15 @@ const WishlistCard: React.FC<WishlistCardProps> = ({ item, onDelete }) => {
   return (
     <>
       <div className="card shadow rounded-4 border-0 h-100">
-        {/* Item Image */}
-        <div
-          className="card-img-top"
-          style={{
-            height: '180px',
-            backgroundImage: item.image ? `url(${item.image})` : 'url(/api/placeholder/800/400)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            borderTopLeftRadius: '1rem',
-            borderTopRightRadius: '1rem',
-          }}
-        />
-
-        {/* Item Header */}
+        {/* Item Header - Directly at the top, no image */}
         <div className="card-header bg-white border-0 d-flex align-items-center">
-          <div>
+          <div className="flex-grow-1">
             <h6 className="mb-0 fw-bold">{item.title}</h6>
             <small className="text-muted">{item.destination} • {item.duration} days</small>
           </div>
 
           {/* Delete button */}
-          <div className="ms-auto">
+          <div>
             <button className="btn btn-outline-danger btn-sm" onClick={handleDeleteClick} aria-label="Remove from wishlist">
               <i className="bi bi-trash me-1"></i> Remove
             </button>
@@ -83,8 +70,8 @@ const WishlistCard: React.FC<WishlistCardProps> = ({ item, onDelete }) => {
           <div className="mb-3">
             <h6 className="fw-bold mb-2">Description</h6>
             <p className={`card-text ${!showFullDescription ? 'text-truncate' : ''}`}>
-  {showFullDescription ? item.description : truncateText(item.description, 150)}
-</p>
+              {showFullDescription ? item.description : truncateText(item.description, 150)}
+            </p>
             {item.description.length > 100 && (
               <button 
                 className="btn btn-link p-0 text-primary" 
