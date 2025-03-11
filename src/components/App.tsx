@@ -14,6 +14,7 @@ import EditPostPage from '../pages/EditPostPage';
 import { useAuth } from '../context/AuthContext';
 import AuthProvider from '../context/AuthProvider';
 import PostDetailPage from '../pages/PostDetailPage';
+import NavigationBar from './NavigationBar';
 import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -43,7 +44,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
 // Main App component
 const AppRoutes = () => {
-  const { loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
 
   if (loading) {
     return (
@@ -56,76 +57,81 @@ const AppRoutes = () => {
   }
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<LoginForm />} />
-      <Route path="/register" element={<RegistrationForm />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/register" element={<RegistrationForm />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-      {/* Protected Routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <>
-              <Homepage />
-            </>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <>
-              <Profile />
-            </>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/generate-trip"
-        element={
-          <ProtectedRoute>
-            <>
-              <GenerateTrip />
-            </>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/add-post"
-        element={
-          <ProtectedRoute>
-            <>
-              <SharePost />
-            </>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/edit-post/:id"
-        element={
-          <ProtectedRoute>
-            <>
-              <EditPostPage />
-            </>
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected Routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <>
+                <Homepage />
+              </>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <>
+                <Profile />
+              </>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/generate-trip"
+          element={
+            <ProtectedRoute>
+              <>
+                <GenerateTrip />
+              </>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/add-post"
+          element={
+            <ProtectedRoute>
+              <>
+                <SharePost />
+              </>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-post/:id"
+          element={
+            <ProtectedRoute>
+              <>
+                <EditPostPage />
+              </>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/post/:id"
-        element={
-          <ProtectedRoute>
-            <PostDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Fallback Route */}
-      <Route path="*" element={<Navigate to="/login" />} />
-    </Routes>
+        <Route
+          path="/post/:id"
+          element={
+            <ProtectedRoute>
+              <PostDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Fallback Route */}
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+      
+      {/* Display Navigation Bar only when user is authenticated */}
+      {isAuthenticated && <NavigationBar />}
+    </>
   );
 };
 
