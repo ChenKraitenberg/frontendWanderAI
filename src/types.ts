@@ -21,6 +21,7 @@ export interface PostComment {
 export interface Post {
   _id: string;
   title: string;
+  name: string;
   description: string;
   image?: string;
   startDate?: Date | string;

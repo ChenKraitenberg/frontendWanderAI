@@ -42,8 +42,12 @@ const EditPostPage: React.FC = () => {
 
         const formattedEndDate = post.endDate ? new Date(post.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
+        const postTitle = post.title || post.name || '';
+
         setFormData({
           ...post,
+          title: postTitle,
+          name: postTitle,
           startDate: formattedStartDate,
           endDate: formattedEndDate,
         });
@@ -73,10 +77,19 @@ const EditPostPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    setFormData((prev) => {
+      const updatedData = { ...prev, [name]: value };
+      
+      // If updating title field, also update name field (and vice versa)
+      if (name === 'title') {
+        updatedData.name = value;
+      } else if (name === 'name') {
+        updatedData.title = value;
+      }
+      
+      return updatedData;
+    });
   };
 
   const handleNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,6 +132,8 @@ const EditPostPage: React.FC = () => {
       // Update the post with new data
       const updatedPostData = {
         ...formData,
+        title: formData.title || formData.name,
+        name: formData.name || formData.title,
         image: updatedImageUrl,
         startDate: (formData.startDate as string) || '',
         endDate: (formData.endDate as string) || '',
@@ -198,7 +213,14 @@ const EditPostPage: React.FC = () => {
                   {/* Trip Details */}
                   <div className="mb-4">
                     <label className="form-label">Trip Name</label>
-                    <input type="text" className="form-control form-control-lg rounded-pill" name="title" value={formData.title || ''} onChange={handleInputChange} required />
+                    <input 
+                        type="text" 
+                        className="form-control form-control-lg rounded-pill" 
+                        name="title" 
+                        value={formData.title || formData.name || ''} 
+                        onChange={handleInputChange} 
+                        required 
+                      />
                   </div>
 
                   {/* Destination Field */}
