@@ -4,11 +4,14 @@ import 'bootstrap/dist/css/bootstrap.css';
 import App from './components/App.tsx';
 import AuthProvider from './context/AuthProvider.tsx';
 import './styles/visual-enhancements.css';
+import { BrowserRouter } from 'react-router-dom';
 
 createRoot(document.getElementById('root')!).render(
-  <AuthProvider>
-    <StrictMode>
-      <App />
-    </StrictMode>
-  </AuthProvider>
+  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <AuthProvider>
+      <StrictMode>
+        <App />
+      </StrictMode>
+    </AuthProvider>
+  </BrowserRouter>
 );

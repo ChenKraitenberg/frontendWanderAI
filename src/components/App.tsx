@@ -1,5 +1,5 @@
 // src/components/App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import LoginForm from '../pages/LoginForm';
@@ -133,10 +133,8 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <ToastContainer position="top-right" autoClose={3000} />
-        <AppRoutes />
-      </BrowserRouter>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <AppRoutes />
     </AuthProvider>
   );
 };

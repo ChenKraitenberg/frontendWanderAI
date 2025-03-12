@@ -285,10 +285,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           console.log('Updating user information in all posts and comments...');
 
-          // Update all user posts with the new profile info
-          await postService.updateUserInfoInAllPosts(userId, userData);
-
-          // Additionally, update all comments made by this user in any post
+          // Update all comments made by this user in any post
           await postService.updateUserInfoInAllComments(userId, userData);
 
           console.log('Successfully updated user info in posts and comments');
