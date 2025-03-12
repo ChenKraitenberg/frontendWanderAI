@@ -40,6 +40,24 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
   return `${baseURL}/uploads/${encodeURIComponent(filename)}`;
 };
 
+export const getProfileImageUrl = (imagePath: string | null | undefined): string => {
+  if (!imagePath) {
+    return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
+  }
+  
+  // Get base URL using the existing function
+  const baseUrl = getImageUrl(imagePath);
+  
+  // Add cache busting parameter for non-data URLs
+  if (!baseUrl.startsWith('data:')) {
+    // Add timestamp to force browser to reload the image
+    return `${baseUrl}?t=${Date.now()}`;
+  }
+  
+  return baseUrl;
+};
+
+
 /**
  * Debug helper to trace avatar resolution
  */
