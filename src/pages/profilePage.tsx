@@ -11,7 +11,7 @@ import PostCard from '../components/PostCard';
 import LogoutButton from '../components/LogoutButton';
 import ProfileEdit from '../components/ProfileEdit';
 import { Post } from '../types';
-import ProfileImageUploader from '../components/ProfileImageUploader';
+//import ProfileImageUploader from '../components/ProfileImageUploader';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
 import WishlistCard from '../components/WishlistCard';
 import { getProfileImageUrl } from '../utils/imageUtils';
@@ -151,14 +151,14 @@ const ProfilePage: React.FC = () => {
   };
 
   // Function to update profile image in local state
-  const handleProfileImageUpdate = (newImageUrl: string) => {
-    if (user) {
-      setUser({
-        ...user,
-        avatar: newImageUrl,
-      });
-    }
-  };
+ // const handleProfileImageUpdate = (newImageUrl: string) => {
+    //if (user) {
+    //  setUser({
+    //    ...user,
+    //    avatar: newImageUrl,
+    //  });
+   // }
+ // };
 
   // Function to handle profile updates
   const handleProfileUpdate = (updatedUser: { name?: string; avatar?: string }) => {
@@ -266,8 +266,8 @@ const ProfilePage: React.FC = () => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };
 
-  const handleImageSelect = (file: File) => {
-    // In profilePage, we only want immediate changes if we're not in edit mode
+  //const handleImageSelect = (file: File) => {
+   /* // In profilePage, we only want immediate changes if we're not in edit mode
     // We're using this function for the top section avatar only
     if (!user || !user._id) return;
     
@@ -288,8 +288,8 @@ const ProfilePage: React.FC = () => {
       // If in edit mode, this should never be called because the ProfileImageUploader
       // in the header section shouldn't be interactive when editing
       console.warn('Unexpected image selection while in edit mode');
-    }
-  };
+    }*/
+ // };
 
 
   if (loading) {
@@ -319,11 +319,17 @@ const ProfilePage: React.FC = () => {
             <div className="col-auto">
               <div className="position-relative">
               {user?._id ? (
-                <ProfileImageUploader 
-                currentImage={getProfileImageUrl(user.avatar)}
-                onImageSelect={handleImageSelect}
-                disabled={isEditingProfile}
-              />
+                // שינוי: החלפנו את ProfileImageUploader בתמונה סטטית
+                <div
+                  className="rounded-4 shadow-lg border-4 border-white"
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundImage: `url(${getProfileImageUrl(user.avatar)})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                />
               ) : (
                 <div
                   className="rounded-4 shadow-lg border-4 border-white"

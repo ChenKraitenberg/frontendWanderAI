@@ -146,7 +146,7 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onUpdate, onCancel }) =
         <form onSubmit={handleSubmit}>
           {/* Profile Image */}
           <div className="text-center mb-4">
-            <ProfileImageUploader 
+          <ProfileImageUploader 
               currentImage={displayImageUrl} 
               onImageSelect={handleProfileImageSelect} 
               disabled={isSubmitting}
