@@ -40,13 +40,29 @@ const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
 */
 
-const imageUrl = getProfileImageUrl(currentImage);
+let imageUrl = '';
+  
+if (currentImage) {
+  // בדוק אם זה כבר object URL (בד"כ מתחיל ב-blob:)
+  if (currentImage.startsWith('blob:') || currentImage.startsWith('data:')) {
+    imageUrl = currentImage;
+    console.log("Using direct blob/data URL:", imageUrl.substring(0, 50) + "...");
+  } else {
+    // אחרת, השתמש בפונקציית getProfileImageUrl
+    imageUrl = getProfileImageUrl(currentImage);
+    console.log("Using processed URL:", imageUrl.substring(0, 50) + "...");
+  }
+} else {
+  // תמונת ברירת מחדל
+  imageUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
+  console.log("Using default placeholder image");
+}
 
   return (
     <div className="position-relative">
       {/* Main image container */}
       <div
-        className="rounded-4 shadow-lg border-4 border-white"
+        className={`rounded-4 shadow-lg border-4 border-white ${!disabled ? 'cursor-pointer' : ''}`}
         style={{
           width: '120px',
           height: '120px',
@@ -56,17 +72,16 @@ const imageUrl = getProfileImageUrl(currentImage);
           cursor: disabled ? 'default' : 'pointer',
           opacity: disabled ? 0.7 : 1,
         }}
-        onClick={openFileSelector}>
+        onClick={disabled ? undefined : openFileSelector}>
 
-        {/* Camera icon */}
-        <div 
-          className="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2 shadow-sm" 
-          style={{ 
-            transform: 'translate(30%, 30%)', 
-            opacity: disabled ? 0.5 : 1 
-          }}>
-          <span className="text-white">📷</span>
-        </div>
+        {/* Camera icon - מוצג רק אם אפשר לעדכן */}
+        {!disabled && (
+          <div 
+            className="position-absolute bottom-0 end-0 bg-primary rounded-circle p-2 shadow-sm" 
+            style={{ transform: 'translate(30%, 30%)' }}>
+            <span className="text-white">📷</span>
+          </div>
+        )}
       </div>
 
       {/* Hidden file input */}
