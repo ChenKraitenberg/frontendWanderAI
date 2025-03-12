@@ -339,6 +339,56 @@ class PostService {
       });
   }
 
+  async updateUserInfoInAllPosts(userId: string, updatedUserInfo: { name?: string; avatar?: string }): Promise<number> {
+    try {
+      console.log(`Starting to update user info in posts for user ${userId}:`, updatedUserInfo);
+  
+      // Get all posts by this user
+      const userPosts = await this.getByUserId(userId);
+      console.log(`Found ${userPosts.length} posts to update`);
+  
+      let postsUpdated = 0;
+  
+      // Process each post
+      for (const post of userPosts) {
+        try {
+          // Make sure post.user exists and is an object
+          if (post.user && typeof post.user === 'object' && post.user._id === userId) {
+            console.log(`Updating post ${post._id} with new user info`);
+  
+            // Create the updated user object properly
+            const updatedUser = {
+              ...post.user,
+              ...(updatedUserInfo.name !== undefined ? { name: updatedUserInfo.name } : {}),
+              ...(updatedUserInfo.avatar !== undefined ? { avatar: updatedUserInfo.avatar } : {})
+            };
+  
+            // Create a clean copy of the post to avoid reference issues
+            const postToUpdate = {
+              ...post,
+              user: updatedUser
+            };
+  
+            // Update the post
+            await this.updatePost(post._id, postToUpdate);
+            postsUpdated++;
+          } else {
+            console.warn(`Skipping post ${post._id} - invalid user info:`, post.user);
+          }
+        } catch (postError) {
+          console.error(`Failed to update post ${post._id}:`, postError);
+        }
+      }
+  
+      console.log(`Updated user info in ${postsUpdated} posts`);
+      return postsUpdated;
+    } catch (error) {
+      console.error('Error updating user info in posts:', error);
+      throw error;
+    }
+  }
+
+
   async updateUserInfoInAllComments(userId: string, updatedUserInfo: { name?: string; avatar?: string }): Promise<number> {
     try {
       console.log(`Starting to update user info in comments for user ${userId}:`, updatedUserInfo);
@@ -409,6 +459,7 @@ class PostService {
       throw error;
     }
   }
+
   async updateUserInfoEverywhere(userId: string, updatedUserInfo: { name?: string; avatar?: string }): Promise<{ posts: number; comments: number }> {
     try {
       console.log(`Starting comprehensive update of user info for user ${userId}:`, updatedUserInfo);

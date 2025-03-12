@@ -14,6 +14,7 @@ import { Post } from '../types';
 import ProfileImageUploader from '../components/ProfileImageUploader';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
 import WishlistCard from '../components/WishlistCard';
+import { getProfileImageUrl } from '../utils/imageUtils';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -265,6 +266,32 @@ const ProfilePage: React.FC = () => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };
 
+  const handleImageSelect = (file: File) => {
+    // In profilePage, we only want immediate changes if we're not in edit mode
+    // We're using this function for the top section avatar only
+    if (!user || !user._id) return;
+    
+    if (!isEditingProfile) {
+      // Only upload and update immediately if NOT in edit mode
+      toast.info('Uploading profile picture...');
+      
+      userService.uploadProfileImage(file)
+        .then(response => {
+          handleProfileImageUpdate(response.url);
+          toast.success('Profile picture updated!');
+        })
+        .catch(error => {
+          console.error('Failed to upload profile image:', error);
+          toast.error('Failed to upload profile image');
+        });
+    } else {
+      // If in edit mode, this should never be called because the ProfileImageUploader
+      // in the header section shouldn't be interactive when editing
+      console.warn('Unexpected image selection while in edit mode');
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="min-vh-100 d-flex justify-content-center align-items-center">
@@ -291,20 +318,24 @@ const ProfilePage: React.FC = () => {
           <div className="row align-items-center">
             <div className="col-auto">
               <div className="position-relative">
-                {user?._id ? (
-                  <ProfileImageUploader currentImage={user.avatar || null} userId={user._id} onImageUpdate={handleProfileImageUpdate} />
-                ) : (
-                  <div
-                    className="rounded-4 shadow-lg border-4 border-white"
-                    style={{
-                      width: '120px',
-                      height: '120px',
-                      backgroundImage: 'url(/api/placeholder/120/120)',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
-                )}
+              {user?._id ? (
+                <ProfileImageUploader 
+                currentImage={getProfileImageUrl(user.avatar)}
+                onImageSelect={handleImageSelect}
+                disabled={isEditingProfile}
+              />
+              ) : (
+                <div
+                  className="rounded-4 shadow-lg border-4 border-white"
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundImage: 'url(/api/placeholder/120/120)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                />
+              )}
               </div>
             </div>
             <div className="col text-white">
