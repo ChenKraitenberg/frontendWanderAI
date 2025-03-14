@@ -24,7 +24,18 @@ const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState<'trips' | 'wishlist'>('trips');
+  const [contentVisible, setContentVisible] = useState(false);
+  const [pageReady, setPageReady] = useState(false);
 
+  useEffect(() => {
+    // Show the content after a minimal delay to allow rendering to complete
+    const timer = setTimeout(() => {
+      setPageReady(true);
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true);
@@ -172,15 +183,27 @@ const ProfilePage: React.FC = () => {
   };
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  
     const loadData = async () => {
-      const userData = await fetchUserData();
-      if (userData?._id) {
-        await fetchUserPosts(userData._id);
-
-        fetchWishlistItems();
+      setLoading(true);
+      try {
+        const userData = await fetchUserData();
+        if (userData?._id) {
+          await fetchUserPosts(userData._id);
+          fetchWishlistItems();
+        }
+      
+        setTimeout(() => {
+          setContentVisible(true);
+        }, 50);
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+      } finally {
+        setLoading(false);
       }
     };
-
+  
     loadData();
   }, [fetchUserData]);
 
@@ -266,32 +289,6 @@ const ProfilePage: React.FC = () => {
     navigate(`/post/${postId}`, { state: { showComments: true } });
   };
 
-  //const handleImageSelect = (file: File) => {
-   /* // In profilePage, we only want immediate changes if we're not in edit mode
-    // We're using this function for the top section avatar only
-    if (!user || !user._id) return;
-    
-    if (!isEditingProfile) {
-      // Only upload and update immediately if NOT in edit mode
-      toast.info('Uploading profile picture...');
-      
-      userService.uploadProfileImage(file)
-        .then(response => {
-          handleProfileImageUpdate(response.url);
-          toast.success('Profile picture updated!');
-        })
-        .catch(error => {
-          console.error('Failed to upload profile image:', error);
-          toast.error('Failed to upload profile image');
-        });
-    } else {
-      // If in edit mode, this should never be called because the ProfileImageUploader
-      // in the header section shouldn't be interactive when editing
-      console.warn('Unexpected image selection while in edit mode');
-    }*/
- // };
-
-
   if (loading) {
     return (
       <div className="min-vh-100 d-flex justify-content-center align-items-center">
@@ -304,7 +301,29 @@ const ProfilePage: React.FC = () => {
   console.log('Profile rendering with name:', getUserDisplayName(user));
   console.log('User object in profile:', user);
 
+  
   return (
+    <>
+      <style>
+        {`
+          .profile-content {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+          }
+          
+          .profile-content.visible {
+            opacity: 1;
+          }
+        `}
+      </style>
+    <div 
+    className={`container flex-grow-1 profile-content ${contentVisible ? 'visible' : ''}`} 
+    style={{ 
+      marginTop: '-3rem',
+      opacity: contentVisible ? 1 : 0,
+      transition: 'opacity 0.3s ease'
+    }}
+  >{
     <div className="min-vh-100 d-flex flex-column bg-light">
       {/* Header Section */}
       <div
@@ -313,6 +332,8 @@ const ProfilePage: React.FC = () => {
           background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%)',
           borderRadius: '0 0 25px 25px',
           padding: '3rem 0 6rem',
+          opacity: pageReady ? 1 : 0,
+          transition: 'opacity 0.3s ease',
         }}>
         <div className="container">
           <div className="row align-items-center">
@@ -510,6 +531,8 @@ const ProfilePage: React.FC = () => {
 
       <Footer />
     </div>
+ } </div>
+ </>
   );
 };
 export default ProfilePage;

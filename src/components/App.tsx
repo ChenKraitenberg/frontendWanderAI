@@ -19,6 +19,7 @@ import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import '../styles/visual-enhancements.css';
+import ScrollRestoration from './ScrollRestoration';
 
 // Protected route component using the AuthContext
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
@@ -139,9 +140,11 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <ToastContainer position="top-right" autoClose={3000} />
-      <AppRoutes />
-    </AuthProvider>
+    <ToastContainer position="top-right" autoClose={3000} />
+    {/* Add ScrollRestoration here */}
+    <ScrollRestoration />
+    <AppRoutes />
+  </AuthProvider>
   );
 };
 
