@@ -44,7 +44,7 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommentClick, onDelete, onEdit, showActions = true }) => {
   const navigate = useNavigate();
-  const location = useLocation(); 
+  const location = useLocation();
   const userId = localStorage.getItem('userId');
   const isOwner = userId === post.userId;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -53,7 +53,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
   const [currentPost, setCurrentPost] = useState<Post>(post);
   const [refreshTrigger, setRefreshTrigger] = useState(Date.now());
 
-  
   // Function to update current post with latest user info from localStorage
   const updatePostWithLatestUserInfo = useCallback(() => {
     if (post.userId === userId && post.user) {
@@ -73,6 +72,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
       setCurrentPost(updatedPost);
     }
   }, [post, userId]);
+
+  useEffect(() => {
+    console.log('Current post data:', currentPost);
+  }, [currentPost]);
 
   // Update post with latest user info on mount and when post changes
   useEffect(() => {
@@ -178,9 +181,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
     }
   };
 
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+  // const truncateText = (text: string, maxLength: number) => {
+  //   if (text.length <= maxLength) return text;
+  //   return text.substring(0, maxLength) + '...';
+  // };
+  const truncateText = (text: string | null | undefined, maxLength: number): string => {
+    if (typeof text !== 'string') return '';
+    return text.length <= maxLength ? text : text.substring(0, maxLength) + '...';
   };
 
   const handleEditClick = () => {
@@ -266,26 +273,26 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
   const displayTitle = currentPost.name || currentPost.title;
 
   const handleCommentClick = (postId: string) => {
-  if (onCommentClick) {
-    onCommentClick(postId);
-  } else {
-    navigate(`/post/${postId}`, { state: { showComments: true } });
-  }
-};
+    if (onCommentClick) {
+      onCommentClick(postId);
+    } else {
+      navigate(`/post/${postId}`, { state: { showComments: true } });
+    }
+  };
 
-const handlePostClick = () => {
-  if (onPostClick) {
-    onPostClick(); 
-  } else {
-    const currentScrollPosition = window.scrollY;
-    navigate(`/post/${post._id}`, { 
-      state: { 
-        from: location.pathname,
-        scrollPosition: currentScrollPosition
-      }
-    });
-  }
-};
+  const handlePostClick = () => {
+    if (onPostClick) {
+      onPostClick();
+    } else {
+      const currentScrollPosition = window.scrollY;
+      navigate(`/post/${post._id}`, {
+        state: {
+          from: location.pathname,
+          scrollPosition: currentScrollPosition,
+        },
+      });
+    }
+  };
 
   return (
     <>
@@ -321,14 +328,10 @@ const handlePostClick = () => {
 
         {/* Post Content */}
         <div onClick={handlePostClick}>
-        <div className="card-body">
-        <h5 
-            className="card-title fw-bold mb-2" 
-            style={{ cursor: 'pointer' }} 
-            onClick={handlePostClick}
-          >
-            {displayTitle}
-          </h5>
+          <div className="card-body">
+            <h5 className="card-title fw-bold mb-2" style={{ cursor: 'pointer' }} onClick={handlePostClick}>
+              {displayTitle}
+            </h5>
           </div>
 
           {/* Destination display */}
@@ -351,7 +354,8 @@ const handlePostClick = () => {
               lineHeight: '1.5em',
               maxHeight: '4.5em',
             }}>
-            {truncateText(currentPost.description, 120)}
+            {/* {truncateText(currentPost.description, 120)} */}
+            {truncateText(currentPost.description || '', 120)}
           </p>
 
           {/* Trip Details */}
@@ -421,7 +425,7 @@ const handlePostClick = () => {
               e.currentTarget.style.color = '#6c757d';
             }}>
             <i className="bi bi-chat me-1"></i>
-            {currentPost.comments.length} Comments
+            {(currentPost.comments && currentPost.comments.length) || 0} Comments
           </button>
         </div>
       </div>
