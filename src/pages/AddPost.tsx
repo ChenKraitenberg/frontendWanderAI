@@ -18,7 +18,7 @@ const AddPost = () => {
     description: '',
     startDate: new Date(),
     endDate: new Date(),
-    price: 0,
+    price: '',
     maxSeats: 1,
     bookedSeats: 0,
     image: null as File | null,
@@ -107,13 +107,16 @@ const AddPost = () => {
         throw new Error('User ID not found. Please log in again.');
       }
 
+      // Convert price string to number
+      const numericPrice = formData.price === '' ? 0 : Number(formData.price);
+
       // Create post with user info
       const postData = {
         name: formData.name,
         description: formData.description,
         startDate: formData.startDate.toISOString(),
         endDate: formData.endDate.toISOString(),
-        price: Number(formData.price),
+        price: numericPrice,
         maxSeats: Number(formData.maxSeats),
         bookedSeats: 0,
         image: uploadResponse.url,
@@ -235,10 +238,19 @@ const AddPost = () => {
                       className="form-control form-control-lg rounded-pill"
                       placeholder="Destination (e.g., Paris, France)"
                       value={formData.destination}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, destination: e.target.value }))}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // תיקוף: מאפשר רק אותיות, רווחים, פסיקים ומקפים
+                        if (value === '' || /^[A-Za-zא-ת\s,.'-]*$/.test(value)) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            destination: value
+                          }));
+                        }
+                      }}
                       required
                     />
-                    <div className="form-text">Specify the location for better discovery</div>
+                    <div className="form-text">Specify the location for better discovery (letters only)</div>
                   </div>
 
                   <div className="row g-4 mb-4">
@@ -268,13 +280,27 @@ const AddPost = () => {
                     <div className="col-md-4">
                       <label className="form-label">Price</label>
                       <input
-                        type="number"
+                        type="text"
                         className="form-control form-control-lg rounded-pill"
                         placeholder="Price"
                         value={formData.price}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || (/^[1-9][0-9]*$/.test(value) || value === '0')) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              price: value
+                            }));
+                          }
+                        }}
+                        style={{ 
+                          WebkitAppearance: "none", 
+                          MozAppearance: "textfield",
+                          appearance: "textfield"
+                        }}
                         required
                       />
+                      <div className="form-text ps-2">Enter price in USD (numbers only)</div>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label">Maximum Seats</label>
