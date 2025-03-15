@@ -50,6 +50,7 @@ const EditPostPage: React.FC = () => {
           name: postTitle,
           startDate: formattedStartDate,
           endDate: formattedEndDate,
+          price: post.price || 0,
         });
 
         if (post.image) {
@@ -137,7 +138,7 @@ const EditPostPage: React.FC = () => {
         image: updatedImageUrl,
         startDate: (formData.startDate as string) || '',
         endDate: (formData.endDate as string) || '',
-        // Omit comments to prevent type conflicts
+        price: formData.price,
         comments: undefined,
       };
 
@@ -225,17 +226,23 @@ const EditPostPage: React.FC = () => {
 
                   {/* Destination Field */}
                   <div className="mb-4">
-                    <label className="form-label">Destination</label>
                     <input
                       type="text"
                       className="form-control form-control-lg rounded-pill"
-                      name="destination"
-                      placeholder="e.g. Paris, France"
-                      value={formData.destination || ''}
-                      onChange={handleInputChange}
+                      placeholder="Destination (e.g., Paris, France)"
+                      value={formData.destination}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '' || /^[A-Za-zא-ת\s,.'-]*$/.test(value)) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            destination: value
+                          }));
+                        }
+                      }}
                       required
                     />
-                    <small className="text-muted">Enter a specific location to show on your travel map</small>
+                    <div className="form-text">Specify the location for better discovery (letters only)</div>
                   </div>
 
                   <div className="row g-4 mb-4">
@@ -252,7 +259,29 @@ const EditPostPage: React.FC = () => {
                   <div className="row g-4 mb-4">
                     <div className="col-md-4">
                       <label className="form-label">Price</label>
-                      <input type="number" className="form-control form-control-lg rounded-pill" name="price" value={formData.price || 0} onChange={handleNumberInputChange} required />
+                      <input
+                        type="text" 
+                        className="form-control form-control-lg rounded-pill"
+                        name="price"
+                        placeholder="Enter price"
+                        value={formData.price === 0 ? '' : String(formData.price || '')} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || (/^[1-9][0-9]*$/.test(value) || value === '0')) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              price: value === '' ? 0 : Number(value)
+                            }));
+                          }
+                        }}
+                        style={{ 
+                          WebkitAppearance: "none", 
+                          MozAppearance: "textfield",
+                          appearance: "textfield"
+                        }}
+                        required
+                      />
+                      <div className="form-text">Enter price in USD (numbers only)</div>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label">Maximum Seats</label>

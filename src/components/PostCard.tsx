@@ -156,7 +156,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
   // Format the date
   const formatDate = (date: Date | string) => {
     const d = new Date(date);
-    return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
+    return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
   // Format relative time for post creation
@@ -336,7 +336,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
 
           {/* Destination display */}
           {currentPost.destination && (
-            <div className="mb-2">
+            <div className="mb-2 ps-3">
               <small className="text-muted d-flex align-items-center">
                 <i className="bi bi-geo-alt me-1"></i>
                 {currentPost.destination}
@@ -345,7 +345,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
           )}
 
           <p
-            className="card-text text-muted mb-3"
+            className="card-text text-muted mb-3 ps-3"
             style={{
               overflow: 'hidden',
               display: '-webkit-box',
@@ -360,7 +360,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
 
           {/* Trip Details */}
           {(currentPost.startDate || currentPost.price) && (
-            <div className="d-flex flex-wrap gap-3 mb-3">
+            <div className="d-flex flex-wrap gap-3 mb-3 ps-3">
               {currentPost.startDate && (
                 <div className="small text-muted">
                   <i className="bi bi-calendar me-1"></i>
@@ -383,7 +383,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onPostClick, onLike, onCommen
 
           {/* Category Badge */}
           {currentPost.category && (
-            <div className="mb-3">
+            <div className="mb-3 ps-3">
               <span
                 className="badge rounded-pill px-3 py-2"
                 style={{
