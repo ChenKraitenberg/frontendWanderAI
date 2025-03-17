@@ -330,7 +330,7 @@ import { toast } from 'react-toastify';
 import postService from '../services/post_service';
 import { PostComment } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
-import { getUserDisplayName } from '../utils/userDisplayUtils';
+//import { getUserDisplayName } from '../utils/userDisplayUtils';
 
 interface CommentSectionProps {
   postId: string;
@@ -500,18 +500,25 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
   // Get comment author avatar URL with cache busting
   const getCommentAuthorAvatarUrl = (comment: PostComment) => {
     // Check if it's the current user
-    if (comment.user._id === userId && userAvatar) {
+    if (comment.user._id === userId) {
       // If current user, use the latest avatar from localStorage
-      return getCurrentUserAvatarUrl();
+      const storedAvatar = localStorage.getItem('userAvatar');
+      if (storedAvatar) {
+        // Don't add timestamp to data URLs
+        if (storedAvatar.startsWith('data:')) {
+          return storedAvatar;
+        }
+        return `${getImageUrl(storedAvatar)}?t=${avatarRefreshKey}`;
+      }
     }
-
+  
     // Otherwise use the avatar from the comment
     if (!comment.user.avatar) return '/api/placeholder/40/40';
-
-    // If it's a data URL, return as is
-    if (comment.user.avatar.startsWith('data:')) return comment.user.avatar;
-
-    // Add cache busting parameter
+  
+    // Don't add timestamp to data URLs
+    if (comment.user.avatar.startsWith('data:')) {
+      return comment.user.avatar;
+    }
     return `${getImageUrl(comment.user.avatar)}?t=${avatarRefreshKey}`;
   };
 
@@ -522,9 +529,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId, initialComments
       // If current user, use the latest name from localStorage
       return userName;
     }
-
+  
     // Otherwise use the name from the comment
-    return getUserDisplayName(comment.user);
+    return comment.user.name || comment.user.email || 'Anonymous';
   };
 
   return (
