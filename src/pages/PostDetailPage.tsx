@@ -7,7 +7,7 @@ import LikeButton from '../components/LikeButton';
 import CommentSection from '../components/CommentSection';
 import { Post } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
-import { getUserDisplayName } from '../utils/userDisplayUtils';
+//import { getUserDisplayName } from '../utils/userDisplayUtils';
 
 const PostDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,47 +169,45 @@ const PostDetailPage: React.FC = () => {
     return post.title;
   };
 
-  // Get user's avatar with cache busting
-  // const getUserAvatar = (avatarPath: string | null | undefined) => {
-  //   // If it's the current user, check localStorage first
-  //   if (post?.userId === userId) {
-  //     const localAvatar = localStorage.getItem('userAvatar');
-  //     if (localAvatar) {
-  //       // If it's a data URL, return as is
-  //       if (localAvatar.startsWith('data:')) return localAvatar;
 
-  //       // Otherwise add cache-busting parameter
-  //       return `${getImageUrl(localAvatar)}?t=${forceRefresh}`;
-  //     }
-  //   }
-
-  //   if (!avatarPath) return '/api/placeholder/48/48';
-
-  //   // Add cache-busting parameter
-  //   return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
-  // };
-  // Fixed getUserAvatar function in PostDetailPage.tsx
-  // Keep the same function but modify the logic:
-
-  const getUserAvatar = (avatarPath: string | null | undefined) => {
-    // If it's the current user, check localStorage first
-    if (post?.user && post.userId === userId) {
-      const localAvatar = localStorage.getItem('userAvatar');
-      if (localAvatar) {
-        // If it's a data URL, return as is
-        if (localAvatar.startsWith('data:')) return localAvatar;
-
-        // Otherwise add cache-busting parameter
-        return `${getImageUrl(localAvatar)}?t=${forceRefresh}`;
-      }
+// Get user's avatar with cache busting
+const getUserAvatar = () => {
+  if (!post) return '';
+  // ONLY apply localStorage data if this post belongs to the current user
+  if (post.userId === userId && post.user) {
+    const storedAvatar = localStorage.getItem('userAvatar');
+    if (storedAvatar) {
+      return storedAvatar.startsWith('data:') 
+        ? storedAvatar 
+        : `${getImageUrl(storedAvatar)}?t=${forceRefresh}`;
     }
+  }
+  
+  // Otherwise use the post's original user avatar
+  if (post.user?.avatar) {
+    return post.user.avatar.startsWith('data:') 
+      ? post.user.avatar 
+      : `${getImageUrl(post.user.avatar)}?t=${forceRefresh}`;
+  }
+  
+  return '/api/placeholder/48/48';
+};
 
-    if (!avatarPath) return '/api/placeholder/48/48';
 
-    // For non-data URLs, add cache-busting parameter
-    if (!avatarPath.startsWith('data:')) {
-      return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
+const getPostUserDisplayName = () => {
+  if (!post) return '';
+  // ONLY use localStorage name for the current logged-in user
+  if (post.userId === userId && post.user) {
+    const storedName = localStorage.getItem('userName');
+    if (storedName) {
+      return storedName;
     }
+  }
+  
+  // Otherwise use the original user name from the post
+  return post.user?.name || post.user?.email || 'Anonymous';
+};
+
 
     // Return data URLs as-is
     return avatarPath;
@@ -269,14 +267,14 @@ const PostDetailPage: React.FC = () => {
                 <div className="d-flex align-items-center mb-4">
                   <div className="flex-shrink-0">
                     <img
-                      src={getUserAvatar(post.user?.avatar)}
+                      src={getUserAvatar()}
                       alt={post.user?.name || 'User'}
                       className="rounded-circle user-avatar-img"
                       style={{ width: '48px', height: '48px', objectFit: 'cover' }}
                     />
                   </div>
                   <div className="ms-3">
-                    <h6 className="mb-0 fw-bold">{getUserDisplayName(post.user)}</h6>
+                    <h6 className="mb-0 fw-bold">{getPostUserDisplayName()}</h6>
                     <p className="text-muted small mb-0">Posted on {formatDate(post.createdAt)}</p>
                   </div>
 
