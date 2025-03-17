@@ -9,7 +9,6 @@ import { Post } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 //import { getUserDisplayName } from '../utils/userDisplayUtils';
 
-
 const PostDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -92,7 +91,6 @@ const PostDetailPage: React.FC = () => {
           const timestamp = Date.now();
           imgElement.src = `${imgElement.src.split('?')[0]}?t=${timestamp}`;
         }
-        
       });
     };
 
@@ -171,6 +169,7 @@ const PostDetailPage: React.FC = () => {
     return post.title;
   };
 
+
 // Get user's avatar with cache busting
 const getUserAvatar = () => {
   if (!post) return '';
@@ -194,6 +193,7 @@ const getUserAvatar = () => {
   return '/api/placeholder/48/48';
 };
 
+
 const getPostUserDisplayName = () => {
   if (!post) return '';
   // ONLY use localStorage name for the current logged-in user
@@ -208,6 +208,10 @@ const getPostUserDisplayName = () => {
   return post.user?.name || post.user?.email || 'Anonymous';
 };
 
+
+    // Return data URLs as-is
+    return avatarPath;
+  };
   if (loading) {
     return (
       <MainLayout>
@@ -233,27 +237,25 @@ const getPostUserDisplayName = () => {
     );
   }
 
-  
   return (
     <MainLayout>
-      <button 
+      <button
         className="btn btn-outline-secondary mb-3"
         onClick={() => {
           const prevPath = location.state?.from || '/';
           const prevScrollPosition = location.state?.scrollPosition || 0;
-          
+
           navigate(prevPath, {
             state: {
-              scrollPosition: prevScrollPosition
+              scrollPosition: prevScrollPosition,
             },
-            replace: true // Add this to replace the current history entry
+            replace: true, // Add this to replace the current history entry
           });
-        }}
-      >
+        }}>
         <i className="bi bi-arrow-left me-2"></i>
         Back to Feed
       </button>
-    
+
       <div className="container py-5">
         {/* Two-Column Layout: Post Content and Image */}
         <div className="row mb-4">
