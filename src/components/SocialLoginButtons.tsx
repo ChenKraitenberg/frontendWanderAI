@@ -113,7 +113,6 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onLoginStart, s
     };
   }, []);
 
-  // First implementation of handleGoogleSignIn removed as it's superseded by the more comprehensive version below
   // Handle username submission
   const handleUsernameSubmit = async () => {
     // Validate username
@@ -263,7 +262,16 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onLoginStart, s
             name: payload.name || '',
           });
           setShowUsernameModal(true);
-          setUsername(payload.name);
+
+          // Create a better default username from the Google name
+          // Remove spaces, special characters, and ensure it's within limits
+          const suggestedUsername = payload.name
+            ? payload.name
+                .replace(/[^a-zA-Z0-9]/g, '') // Remove special chars
+                .substring(0, 20) // Limit length
+            : '';
+
+          setUsername(suggestedUsername);
         } else {
           // Existing user login - proceed directly
           console.log('Existing user - proceeding with login');
