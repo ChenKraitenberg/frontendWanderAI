@@ -9,7 +9,6 @@ import { Post } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { getUserDisplayName } from '../utils/userDisplayUtils';
 
-
 const PostDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -92,7 +91,6 @@ const PostDetailPage: React.FC = () => {
           const timestamp = Date.now();
           imgElement.src = `${imgElement.src.split('?')[0]}?t=${timestamp}`;
         }
-        
       });
     };
 
@@ -172,9 +170,30 @@ const PostDetailPage: React.FC = () => {
   };
 
   // Get user's avatar with cache busting
+  // const getUserAvatar = (avatarPath: string | null | undefined) => {
+  //   // If it's the current user, check localStorage first
+  //   if (post?.userId === userId) {
+  //     const localAvatar = localStorage.getItem('userAvatar');
+  //     if (localAvatar) {
+  //       // If it's a data URL, return as is
+  //       if (localAvatar.startsWith('data:')) return localAvatar;
+
+  //       // Otherwise add cache-busting parameter
+  //       return `${getImageUrl(localAvatar)}?t=${forceRefresh}`;
+  //     }
+  //   }
+
+  //   if (!avatarPath) return '/api/placeholder/48/48';
+
+  //   // Add cache-busting parameter
+  //   return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
+  // };
+  // Fixed getUserAvatar function in PostDetailPage.tsx
+  // Keep the same function but modify the logic:
+
   const getUserAvatar = (avatarPath: string | null | undefined) => {
     // If it's the current user, check localStorage first
-    if (post?.userId === userId) {
+    if (post?.user && post.userId === userId) {
       const localAvatar = localStorage.getItem('userAvatar');
       if (localAvatar) {
         // If it's a data URL, return as is
@@ -187,10 +206,14 @@ const PostDetailPage: React.FC = () => {
 
     if (!avatarPath) return '/api/placeholder/48/48';
 
-    // Add cache-busting parameter
-    return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
-  };
+    // For non-data URLs, add cache-busting parameter
+    if (!avatarPath.startsWith('data:')) {
+      return `${getImageUrl(avatarPath)}?t=${forceRefresh}`;
+    }
 
+    // Return data URLs as-is
+    return avatarPath;
+  };
   if (loading) {
     return (
       <MainLayout>
@@ -216,27 +239,25 @@ const PostDetailPage: React.FC = () => {
     );
   }
 
-  
   return (
     <MainLayout>
-      <button 
+      <button
         className="btn btn-outline-secondary mb-3"
         onClick={() => {
           const prevPath = location.state?.from || '/';
           const prevScrollPosition = location.state?.scrollPosition || 0;
-          
+
           navigate(prevPath, {
             state: {
-              scrollPosition: prevScrollPosition
+              scrollPosition: prevScrollPosition,
             },
-            replace: true // Add this to replace the current history entry
+            replace: true, // Add this to replace the current history entry
           });
-        }}
-      >
+        }}>
         <i className="bi bi-arrow-left me-2"></i>
         Back to Feed
       </button>
-    
+
       <div className="container py-5">
         {/* Two-Column Layout: Post Content and Image */}
         <div className="row mb-4">
