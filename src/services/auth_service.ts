@@ -1,6 +1,13 @@
 // src/services/auth_service.ts
 import apiClient from './api-client';
 
+export interface User {
+  _id: string;
+  email: string;
+  name?: string;
+  avatar?: string;
+}
+
 export interface SocialLoginCredentials {
   provider: 'google';
   token: string;
@@ -185,6 +192,24 @@ class AuthService {
     } catch (error) {
       console.error('Token validation failed:', error);
       throw error;
+    }
+  }
+
+  // In auth_service.ts
+  async validateTokenAndGetUser(token: string): Promise<User | null> {
+    try {
+      const response = await apiClient.get<User>('/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // If the request is successful, return the user data
+      return response.data;
+    } catch (error) {
+      // If the request fails (invalid token, user not found, etc.), return null
+      console.error('Token validation error:', error);
+      return null;
     }
   }
 

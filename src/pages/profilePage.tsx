@@ -32,10 +32,10 @@ const ProfilePage: React.FC = () => {
     const timer = setTimeout(() => {
       setPageReady(true);
     }, 50);
-    
+
     return () => clearTimeout(timer);
   }, []);
-  
+
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true);
@@ -161,16 +161,6 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // Function to update profile image in local state
- // const handleProfileImageUpdate = (newImageUrl: string) => {
-    //if (user) {
-    //  setUser({
-    //    ...user,
-    //    avatar: newImageUrl,
-    //  });
-   // }
- // };
-
   // Function to handle profile updates
   const handleProfileUpdate = (updatedUser: { name?: string; avatar?: string }) => {
     if (user) {
@@ -184,7 +174,7 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  
+
     const loadData = async () => {
       setLoading(true);
       try {
@@ -193,7 +183,7 @@ const ProfilePage: React.FC = () => {
           await fetchUserPosts(userData._id);
           fetchWishlistItems();
         }
-      
+
         setTimeout(() => {
           setContentVisible(true);
         }, 50);
@@ -203,7 +193,7 @@ const ProfilePage: React.FC = () => {
         setLoading(false);
       }
     };
-  
+
     loadData();
   }, [fetchUserData]);
 
@@ -301,7 +291,6 @@ const ProfilePage: React.FC = () => {
   console.log('Profile rendering with name:', getUserDisplayName(user));
   console.log('User object in profile:', user);
 
-  
   return (
     <>
       <style>
@@ -316,223 +305,223 @@ const ProfilePage: React.FC = () => {
           }
         `}
       </style>
-    <div 
-    className={`container flex-grow-1 profile-content ${contentVisible ? 'visible' : ''}`} 
-    style={{ 
-      marginTop: '-3rem',
-      opacity: contentVisible ? 1 : 0,
-      transition: 'opacity 0.3s ease'
-    }}
-  >{
-    <div className="min-vh-100 d-flex flex-column bg-light">
-      {/* Header Section */}
       <div
-        className="position-relative"
+        className={`container flex-grow-1 profile-content ${contentVisible ? 'visible' : ''}`}
         style={{
-          background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%)',
-          borderRadius: '0 0 25px 25px',
-          padding: '3rem 0 6rem',
-          opacity: pageReady ? 1 : 0,
+          marginTop: '-3rem',
+          opacity: contentVisible ? 1 : 0,
           transition: 'opacity 0.3s ease',
         }}>
-        <div className="container">
-          <div className="row align-items-center">
-            <div className="col-auto">
-              <div className="position-relative">
-              {user?._id ? (
-                // שינוי: החלפנו את ProfileImageUploader בתמונה סטטית
-                <div
-                  className="rounded-4 shadow-lg border-4 border-white"
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    backgroundImage: `url(${getProfileImageUrl(user.avatar)})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
-              ) : (
-                <div
-                  className="rounded-4 shadow-lg border-4 border-white"
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    backgroundImage: 'url(/api/placeholder/120/120)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
-              )}
-              </div>
-            </div>
-            <div className="col text-white">
-              {/* Use name instead of email when available */}
-              <h1 className="display-6 fw-bold mb-2">{getUserDisplayName(user)}</h1>
-              <div className="d-flex gap-4">
-                <div>
-                  <div className="fw-bold h4 mb-0">{posts.length}</div>
-                  <small className="opacity-75">Trips Planned</small>
-                </div>
-                <div>
-                  <div className="fw-bold h4 mb-0">{calculateTotalDays()}</div>
-                  <small className="opacity-75">Travel Days</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-auto d-flex gap-2">
-              {!isEditingProfile && (
-                <button className="btn btn-light rounded-pill px-4 py-2" onClick={() => setIsEditingProfile(true)}>
-                  <i className="bi bi-pencil me-2"></i>
-                  Edit Profile
-                </button>
-              )}
-              <LogoutButton variant="outline" className="px-4 py-2" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container flex-grow-1" style={{ marginTop: '-3rem' }}>
-        {isEditingProfile ? (
-          // Profile Edit Form
-          <div className="mb-4">
-            {user && user._id && (
-              <ProfileEdit user={user as { _id: string; email: string; name?: string; avatar?: string | null }} onUpdate={handleProfileUpdate} onCancel={() => setIsEditingProfile(false)} />
-            )}
-          </div>
-        ) : (
-          // Map Section
-          <div className="card border-0 shadow-lg rounded-4 mb-4">
-            <div className="card-body p-4">
-              <h3 className="h5 mb-4">My Travel Map</h3>
-              {user?._id && <MapComponent userId={user._id} />}
-            </div>
-          </div>
-        )}
-
-        {/* Tabs for Trips/Wishlist */}
-        <div className="mb-4">
-          <ul className="nav nav-pills nav-fill">
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'trips' ? 'active' : ''}`}
-                onClick={() => setActiveTab('trips')}
-                style={{
-                  background: activeTab === 'trips' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
-                  color: activeTab === 'trips' ? 'white' : '#6c757d',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  fontWeight: 500,
-                  transition: 'all 0.3s ease',
-                }}>
-                My Trips ({posts.length})
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'wishlist' ? 'active' : ''}`}
-                onClick={() => setActiveTab('wishlist')}
-                style={{
-                  background: activeTab === 'wishlist' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
-                  color: activeTab === 'wishlist' ? 'white' : '#6c757d',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  fontWeight: 500,
-                  transition: 'all 0.3s ease',
-                }}>
-                My Wishlist ({wishlistItems.length})
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        {/* Content based on active tab */}
-        {activeTab === 'trips' ? (
-          // My Trips Section
-          <div className="card border-0 shadow-lg rounded-4">
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="h5 mb-0">My Trips</h3>
-                <button
-                  className="btn btn-outline-primary rounded-pill px-3"
-                  onClick={() => navigate('/generate-trip')}
-                  style={{
-                    borderColor: '#4158D0',
-                    color: '#4158D0',
-                  }}>
-                  <span className="me-2">✨</span>
-                  Generate New Trip
-                </button>
-              </div>
-
-              {posts.length > 0 ? (
-                <div className="row g-4">
-                  {posts.map((post) => (
-                    <div key={`post-container-${post._id}`} className="col-md-6 col-lg-4">
-                      <PostCard
-                        key={`post-${post._id}`}
-                        post={post}
-                        onLike={handleLikePost}
-                        onCommentClick={() => post._id && handleCommentClick(post._id)}
-                        onEdit={() => post._id && handleEditPost(post._id)}
-                        onDelete={() => post._id && handleDeletePost(post._id)}
-                        showActions={true}
-                      />
+        {
+          <div className="min-vh-100 d-flex flex-column bg-light">
+            {/* Header Section */}
+            <div
+              className="position-relative"
+              style={{
+                background: 'linear-gradient(135deg, #4158D0 0%, #C850C0 46%, #FFCC70 100%)',
+                borderRadius: '0 0 25px 25px',
+                padding: '3rem 0 6rem',
+                opacity: pageReady ? 1 : 0,
+                transition: 'opacity 0.3s ease',
+              }}>
+              <div className="container">
+                <div className="row align-items-center">
+                  <div className="col-auto">
+                    <div className="position-relative">
+                      {user?._id ? (
+                        <div
+                          className="rounded-4 shadow-lg border-4 border-white"
+                          style={{
+                            width: '120px',
+                            height: '120px',
+                            backgroundImage: `url(${getProfileImageUrl(user.avatar)})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="rounded-4 shadow-lg border-4 border-white"
+                          style={{
+                            width: '120px',
+                            height: '120px',
+                            backgroundImage: 'url(/api/placeholder/120/120)',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }}
+                        />
+                      )}
                     </div>
-                  ))}
+                  </div>
+                  <div className="col text-white">
+                    {/* Use name instead of email when available */}
+                    <h1 className="display-6 fw-bold mb-2">{getUserDisplayName(user)}</h1>
+                    <div className="d-flex gap-4">
+                      <div>
+                        <div className="fw-bold h4 mb-0">{posts.length}</div>
+                        <small className="opacity-75">Trips Planned</small>
+                      </div>
+                      <div>
+                        <div className="fw-bold h4 mb-0">{calculateTotalDays()}</div>
+                        <small className="opacity-75">Travel Days</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-auto d-flex gap-2">
+                    {!isEditingProfile && (
+                      <button className="btn btn-light rounded-pill px-4 py-2" onClick={() => setIsEditingProfile(true)}>
+                        <i className="bi bi-pencil me-2"></i>
+                        Edit Profile
+                      </button>
+                    )}
+                    <LogoutButton variant="outline" className="px-4 py-2" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="container flex-grow-1" style={{ marginTop: '-3rem' }}>
+              {isEditingProfile ? (
+                // Profile Edit Form
+                <div className="mb-4">
+                  {user && user._id && (
+                    <ProfileEdit user={user as { _id: string; email: string; name?: string; avatar?: string | null }} onUpdate={handleProfileUpdate} onCancel={() => setIsEditingProfile(false)} />
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-muted mb-3">You haven't planned any trips yet</p>
-                  <p className="small text-muted">Click the button above to start planning!</p>
+                // Map Section
+                <div className="card border-0 shadow-lg rounded-4 mb-4">
+                  <div className="card-body p-4">
+                    <h3 className="h5 mb-4">My Travel Map</h3>
+                    {user?._id && <MapComponent userId={user._id} />}
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
-        ) : (
-          // My Wishlist Section
-          <div className="card border-0 shadow-lg rounded-4">
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="h5 mb-0">My Wishlist</h3>
-                <button
-                  className="btn btn-outline-primary rounded-pill px-3"
-                  onClick={() => navigate('/generate-trip')}
-                  style={{
-                    borderColor: '#4158D0',
-                    color: '#4158D0',
-                  }}>
-                  <span className="me-2">✨</span>
-                  Create More Ideas
-                </button>
+
+              {/* Tabs for Trips/Wishlist */}
+              <div className="mb-4">
+                <ul className="nav nav-pills nav-fill">
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link ${activeTab === 'trips' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('trips')}
+                      style={{
+                        background: activeTab === 'trips' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
+                        color: activeTab === 'trips' ? 'white' : '#6c757d',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem 1.5rem',
+                        fontWeight: 500,
+                        transition: 'all 0.3s ease',
+                      }}>
+                      My Trips ({posts.length})
+                    </button>
+                  </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link ${activeTab === 'wishlist' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('wishlist')}
+                      style={{
+                        background: activeTab === 'wishlist' ? 'linear-gradient(135deg, #4158D0 0%, #C850C0 100%)' : 'transparent',
+                        color: activeTab === 'wishlist' ? 'white' : '#6c757d',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem 1.5rem',
+                        fontWeight: 500,
+                        transition: 'all 0.3s ease',
+                      }}>
+                      My Wishlist ({wishlistItems.length})
+                    </button>
+                  </li>
+                </ul>
               </div>
 
-              {wishlistItems.length > 0 ? (
-                <div className="row g-4">
-                  {wishlistItems.map((item) => (
-                    <div key={`wishlist-${item.id}`} className="col-md-6 col-lg-4">
-                      <WishlistCard item={item} onDelete={handleRemoveFromWishlist} />
+              {/* Content based on active tab */}
+              {activeTab === 'trips' ? (
+                // My Trips Section
+                <div className="card border-0 shadow-lg rounded-4">
+                  <div className="card-body p-4">
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                      <h3 className="h5 mb-0">My Trips</h3>
+                      <button
+                        className="btn btn-outline-primary rounded-pill px-3"
+                        onClick={() => navigate('/generate-trip')}
+                        style={{
+                          borderColor: '#4158D0',
+                          color: '#4158D0',
+                        }}>
+                        <span className="me-2">✨</span>
+                        Generate New Trip
+                      </button>
                     </div>
-                  ))}
+
+                    {posts.length > 0 ? (
+                      <div className="row g-4">
+                        {posts.map((post) => (
+                          <div key={`post-container-${post._id}`} className="col-md-6 col-lg-4">
+                            <PostCard
+                              key={`post-${post._id}`}
+                              post={post}
+                              onLike={handleLikePost}
+                              onCommentClick={() => post._id && handleCommentClick(post._id)}
+                              onEdit={() => post._id && handleEditPost(post._id)}
+                              onDelete={() => post._id && handleDeletePost(post._id)}
+                              showActions={true}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-muted mb-3">You haven't planned any trips yet</p>
+                        <p className="small text-muted">Click the button above to start planning!</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-muted mb-3">Your wishlist is empty</p>
-                  <p className="small text-muted">Generate a trip and save it to your wishlist!</p>
+                // My Wishlist Section
+                <div className="card border-0 shadow-lg rounded-4">
+                  <div className="card-body p-4">
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                      <h3 className="h5 mb-0">My Wishlist</h3>
+                      <button
+                        className="btn btn-outline-primary rounded-pill px-3"
+                        onClick={() => navigate('/generate-trip')}
+                        style={{
+                          borderColor: '#4158D0',
+                          color: '#4158D0',
+                        }}>
+                        <span className="me-2">✨</span>
+                        Create More Ideas
+                      </button>
+                    </div>
+
+                    {wishlistItems.length > 0 ? (
+                      <div className="row g-4">
+                        {wishlistItems.map((item) => (
+                          <div key={`wishlist-${item.id}`} className="col-md-6 col-lg-4">
+                            <WishlistCard item={item} onDelete={handleRemoveFromWishlist} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-muted mb-3">Your wishlist is empty</p>
+                        <p className="small text-muted">Generate a trip and save it to your wishlist!</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
 
-      <Footer />
-    </div>
- } </div>
- </>
+            <Footer />
+          </div>
+        }{' '}
+      </div>
+    </>
   );
 };
 export default ProfilePage;
