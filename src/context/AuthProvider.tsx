@@ -20,7 +20,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -28,24 +27,45 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userId = localStorage.getItem('userId');
 
         if (token && userId) {
-          setIsAuthenticated(true);
-
-          // If authenticated, try to fetch user data
           try {
-            // אפשר להחליף זאת בקריאה ל-userService.getMe()
-            setUser({
-              _id: userId,
-              email: localStorage.getItem('userEmail') || '',
-              name: localStorage.getItem('userName') || '',
-              avatar: localStorage.getItem('userAvatar') || '',
-            });
-          } catch (err: unknown) {
-            console.error('Failed to fetch user data', err);
-            // במקרה של כישלון, מנסים לרענן את הטוקן
-            await refreshAuth();
+            // Validate token and fetch user data in one step
+            const userData = await authService.validateTokenAndGetUser(token);
+
+            if (userData) {
+              // Successfully validated token and got user data
+              setIsAuthenticated(true);
+              setUser({
+                _id: userData._id,
+                email: userData.email,
+                name: userData.name || '',
+                avatar: userData.avatar || '',
+              });
+
+              // Update localStorage with the latest user info
+              localStorage.setItem('userEmail', userData.email);
+              if (userData.name) localStorage.setItem('userName', userData.name);
+              if (userData.avatar) localStorage.setItem('userAvatar', userData.avatar);
+            } else {
+              // Token invalid or user not found
+              throw new Error('Invalid token');
+            }
+          } catch (error) {
+            // Token validation failed
+            console.error('Token validation failed:', error);
+
+            // Clear all authentication-related localStorage items
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('userName');
+            localStorage.removeItem('userAvatar');
+
+            setIsAuthenticated(false);
+            setUser(null);
           }
         }
-      } catch (err: unknown) {
+      } catch (err) {
         console.error('Authentication check failed', err);
         setIsAuthenticated(false);
         setUser(null);
@@ -56,7 +76,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     checkAuth();
   }, []);
-
   // Set up automatic token refresh every 10 דקות
   useEffect(() => {
     let refreshTimer: NodeJS.Timeout;
@@ -261,7 +280,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
 
-      // 1. Update the user profile
+      // 1. Update the user profile in the database
       const response = await userService.updateProfile(userData);
 
       // 2. Update localStorage values
@@ -270,52 +289,30 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       if (userData.avatar) {
         localStorage.setItem('userAvatar', userData.avatar);
-        localStorage.setItem('userAvatarTimestamp', Date.now().toString()); // Add this line
+        localStorage.setItem('userAvatarTimestamp', Date.now().toString());
       }
 
-      // 3. Update the user state
-      setUser((prev) => {
-        if (!prev) return null;
-        return { ...prev, ...userData };
-      });
-
-      // 4. Now update all posts AND comments by this user
+      // 3. Force a complete update of all posts and comments
       const userId = localStorage.getItem('userId');
       if (userId) {
-        try {
-          console.log('Updating user information in all posts and comments...');
+        // First update all posts
+        await postService.updateUserInfoInAllPosts(userId, userData);
 
-          // Update all comments made by this user in any post
-          await postService.updateUserInfoInAllComments(userId, userData);
+        // Then update all comments
+        await postService.updateUserInfoInAllComments(userId, userData);
 
-          console.log('Successfully updated user info in posts and comments');
-
-          // Dispatch a custom event to notify components about the avatar update
-          window.dispatchEvent(
-            new CustomEvent('user-avatar-updated', {
-              detail: {
-                userId,
-                avatar: userData.avatar,
-                name: userData.name,
-                timestamp: Date.now(),
-              },
-            })
-          );
-        } catch (updateError) {
-          console.error('Error updating posts/comments with new user info:', updateError);
-          // Don't throw error here - we still want profile update to succeed
-        }
+        // Force refresh user content everywhere
+        await postService.forceRefreshUserContent(userId);
       }
 
       return response;
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Failed to update profile:', err);
       throw err;
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <AuthContext.Provider
       value={{
