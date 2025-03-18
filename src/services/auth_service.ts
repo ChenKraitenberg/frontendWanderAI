@@ -63,8 +63,10 @@ class AuthService {
       const response = await apiClient.post('/auth/register', userData);
 
       // Store tokens and user info
-      localStorage.setItem('accessToken', response.data.token);
-      localStorage.setItem('userId', response.data.user._id);
+      // localStorage.setItem('accessToken', response.data.token);
+      // localStorage.setItem('userId', response.data.user._id);
+      localStorage.setItem('accessToken', response.data.accessToken);
+      localStorage.setItem('refreshToken', response.data.refreshToken);
 
       return {
         accessToken: response.data.token,
