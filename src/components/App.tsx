@@ -1,5 +1,10 @@
-// src/components/App.tsx
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
+import { 
+  //BrowserRouter, 
+  Routes, 
+  Route, 
+  Navigate 
+} from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import LoginForm from '../pages/LoginForm';
@@ -22,7 +27,7 @@ import '../styles/visual-enhancements.css';
 import ScrollRestoration from './ScrollRestoration';
 
 // Protected route component using the AuthContext
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   // If user has no name set, redirect to profile to prompt them to set one
@@ -40,7 +45,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
 // Main App component
@@ -71,9 +76,7 @@ const AppRoutes = () => {
           path="/"
           element={
             <ProtectedRoute>
-              <>
-                <Homepage />
-              </>
+              <Homepage />
             </ProtectedRoute>
           }
         />
@@ -81,9 +84,7 @@ const AppRoutes = () => {
           path="/profile"
           element={
             <ProtectedRoute>
-              <>
-                <Profile />
-              </>
+              <Profile />
             </ProtectedRoute>
           }
         />
@@ -91,9 +92,7 @@ const AppRoutes = () => {
           path="/generate-trip"
           element={
             <ProtectedRoute>
-              <>
-                <GenerateTrip />
-              </>
+              <GenerateTrip />
             </ProtectedRoute>
           }
         />
@@ -101,9 +100,7 @@ const AppRoutes = () => {
           path="/add-post"
           element={
             <ProtectedRoute>
-              <>
-                <SharePost />
-              </>
+              <SharePost />
             </ProtectedRoute>
           }
         />
@@ -111,9 +108,7 @@ const AppRoutes = () => {
           path="/edit-post/:id"
           element={
             <ProtectedRoute>
-              <>
-                <EditPostPage />
-              </>
+              <EditPostPage />
             </ProtectedRoute>
           }
         />
@@ -140,11 +135,10 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
-    <ToastContainer position="top-right" autoClose={3000} />
-    {/* Add ScrollRestoration here */}
-    <ScrollRestoration />
-    <AppRoutes />
-  </AuthProvider>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <ScrollRestoration />
+      <AppRoutes />
+    </AuthProvider>
   );
 };
 

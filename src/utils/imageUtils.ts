@@ -12,9 +12,11 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
   }
 
   // If it's already a data URL (base64 encoded image), return it as is
-  if (imagePath.startsWith('data:')) {
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
+  const baseURL = apiClient.defaults.baseURL || 'https://node113.cs.colman.ac.il';
+
 
   // If the image path is already an absolute URL, return it as is
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -22,7 +24,7 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
   }
 
   // Get the base URL from the API client configuration
-  const baseURL = apiClient.defaults.baseURL || 'http://localhost:3060';
+ // const baseURL = apiClient.defaults.baseURL || 'http://localhost:3060';
 
   // Normalize the path - extract just the filename
   let filename = imagePath;
@@ -44,7 +46,6 @@ export const getProfileImageUrl = (imagePath: string | null | undefined): string
   if (!imagePath) {
     return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0"/%3E%3C/svg%3E';
   }
-  
   // Get base URL using the existing function
   const baseUrl = getImageUrl(imagePath);
   

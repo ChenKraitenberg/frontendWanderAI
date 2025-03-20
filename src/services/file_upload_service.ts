@@ -1,10 +1,10 @@
 // src/services/file_upload_service.ts
 import apiClient from './api-client';
 
-interface UploadResponse {
-  url: string;
-  success: boolean;
-}
+//interface UploadResponse {
+//  url: string;
+//  success: boolean;
+//}
 
 class FileUploadService {
   /**

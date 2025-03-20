@@ -1,5 +1,5 @@
 // pages/GenerateTrip.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import MainLayout from '../components/layouts/MainLayout';
 import { toast } from 'react-toastify';
 import { PostPreferences, GeneratedPost, SavedPost } from '../types';

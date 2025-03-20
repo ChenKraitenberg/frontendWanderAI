@@ -1,13 +1,17 @@
 {
   "compilerOptions": {
+    // Build info location
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "types": [],
+
+    // Target and language features
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    // Bundler-specific settings
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
@@ -15,7 +19,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    // Strict type checking and linting
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

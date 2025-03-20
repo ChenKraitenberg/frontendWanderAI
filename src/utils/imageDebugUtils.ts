@@ -82,7 +82,9 @@ export const testImageUrlFormats = () => {
 
   console.group('Testing Image URL Formats');
   testUrls.forEach((url) => {
-    debugImagePath(url, 'TestComponent');
+    if (url !== null) {
+      debugImagePath(url, 'TestComponent');
+    }
   });
   console.groupEnd();
 };

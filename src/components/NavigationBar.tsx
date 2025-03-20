@@ -1,6 +1,6 @@
 // Modified NavigationBar.tsx
 import { FC } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Navigate, NavLink } from 'react-router-dom';
 
 const NavigationBar: FC = () => {
   // Special handler for profile navigation that ensures proper scrolling
@@ -9,7 +9,7 @@ const NavigationBar: FC = () => {
     
     // First force scroll to top
     window.scrollTo(0, 0);
-    
+
     // Then use a small delay before navigation to ensure scroll is complete
     setTimeout(() => {
       window.location.href = '/profile';

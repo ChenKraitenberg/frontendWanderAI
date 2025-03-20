@@ -2,8 +2,9 @@ import axios, { CanceledError, AxiosError } from 'axios';
 
 export { CanceledError };
 
+const backend_url = import.meta.env.VITE_BACKEND_URL
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3060',
+  baseURL: backend_url,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

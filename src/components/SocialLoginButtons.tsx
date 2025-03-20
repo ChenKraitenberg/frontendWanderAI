@@ -53,6 +53,11 @@ declare global {
 }
 
 const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onLoginStart, showUsernamePrompt }) => {
+
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+console.log("Google Client ID from env:", googleClientId);
+
+
   const { socialLogin } = useAuth();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
@@ -86,11 +91,14 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onLoginStart, s
 
     const initializeGoogleSignIn = () => {
       if (window.google) {
+        // window.google.accounts.id.initialize({
+        //   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        //   callback: handleGoogleSignIn,
+        // });
         window.google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          client_id: googleClientId || "668983207302-egcpftg56o6gcr6vprck7ofaas4ba5b3.apps.googleusercontent.com", // שים כאן את המזהה כברירת מחדל
           callback: handleGoogleSignIn,
         });
-
         const googleButtonDiv = document.getElementById('google-signin-button');
         if (googleButtonDiv) {
           window.google.accounts.id.renderButton(googleButtonDiv, {

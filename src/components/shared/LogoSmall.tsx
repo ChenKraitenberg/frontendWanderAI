@@ -1,5 +1,5 @@
 // src/components/shared/LogoSmall.tsx
-import React from 'react';
+//import React from 'react';
 
 const LogoSmall = () => {
   return (
