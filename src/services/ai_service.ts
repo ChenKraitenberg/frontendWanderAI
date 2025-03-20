@@ -93,7 +93,32 @@ const parseGeneratedText = (text: string, preferences: PostPreferences): Generat
   };
 };
 
+
 const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost> => {
+  try {
+    // שינוי הכתובת מ-Hugging Face ישירות לשרת שלך
+    const response = await axios.post(
+      '/api/ai/generate',
+      {
+        inputs: createPrompt(preferences),
+        parameters: {
+          max_length: 1000,
+          temperature: 0.7,
+          top_p: 0.95,
+          return_full_text: false,
+        },
+      }
+    );
+
+    const data = response.data;
+    const generatedText = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+    return parseGeneratedText(generatedText, preferences);
+  } catch (error) {
+    console.error('Error in generateTrip:', error);
+    throw error;
+  }
+};
+/*const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost> => {
   try {
     const response = await axios.post(
       MODEL_URL,
@@ -121,7 +146,7 @@ const generateTrip = async (preferences: PostPreferences): Promise<GeneratedPost
     console.error('Error in generateTrip:', error);
     throw error;
   }
-};
+};*/
 
 export default {
   generateTrip,
